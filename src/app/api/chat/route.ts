@@ -33,11 +33,15 @@ function runOpencode(sessionRoot: string, message: string, files: string[] = [])
     const child = spawn(opencodeBin, args, {
       cwd: sessionRoot,
       env: process.env,
-      shell: false
+      shell: false,
+      stdio: ["ignore", "pipe", "pipe"]
     });
 
     const timeout = setTimeout(() => {
       child.kill("SIGTERM");
+      setTimeout(() => {
+        if (!child.killed) child.kill("SIGKILL");
+      }, 5000);
       reject(new Error(`opencode timed out after ${timeoutMs}ms.`));
     }, timeoutMs);
 

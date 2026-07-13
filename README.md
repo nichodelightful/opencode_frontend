@@ -188,3 +188,11 @@ ls "$HOME/.local/share/opencode/auth.json"
 ```
 
 Your `.env` must point `OPENCODE_AUTH_DIR` to that host directory, not to `/data/workspaces`.
+
+If the browser shows `opencode timed out`, first test the same command inside the running container:
+
+```bash
+docker compose exec app opencode run "用繁體中文回覆 hello"
+```
+
+The app starts opencode without an interactive stdin, so browser requests should not wait for terminal input.
