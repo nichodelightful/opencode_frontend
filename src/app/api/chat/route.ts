@@ -8,6 +8,7 @@ export const maxDuration = 300;
 
 function sanitizeOpencodeOutput(value: string) {
   return value
+    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
     .replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, "")
     .split("\n")
     .filter((line) => {
@@ -18,6 +19,8 @@ function sanitizeOpencodeOutput(value: string) {
       if (trimmed.startsWith("</system-reminder>")) return false;
       if (/^>\s+\S+\s+·\s+/.test(trimmed)) return false;
       if (/^[$%◈]\s+/.test(trimmed)) return false;
+      if (/^✗\s+/.test(trimmed)) return false;
+      if (/^Error:\s+StatusCode:\s+non 2xx status code/.test(trimmed)) return false;
 
       return true;
     })
@@ -39,7 +42,7 @@ function runOpencode(sessionRoot: string, message: string, files: string[] = [],
     const opencodeBin = process.env.OPENCODE_BIN || "opencode";
     const model = cleanModel(modelOverride) || cleanModel(process.env.OPENCODE_MODEL);
     const timeoutMs = Number(process.env.OPENCODE_TIMEOUT_MS || 180000);
-    const args = ["run", "--dir", sessionRoot, "--auto"];
+    const args = ["run", message, "--dir", sessionRoot, "--auto"];
 
     if (model) {
       args.push("--model", model);
@@ -55,8 +58,6 @@ function runOpencode(sessionRoot: string, message: string, files: string[] = [],
 
       args.push("--file", absoluteFile);
     }
-
-    args.push(message);
 
     const child = spawn(opencodeBin, args, {
       cwd: sessionRoot,
@@ -90,7 +91,9 @@ function runOpencode(sessionRoot: string, message: string, files: string[] = [],
     });
     child.on("close", (exitCode) => {
       clearTimeout(timeout);
-      const combined = sanitizeOpencodeOutput([output.trim(), errorOutput.trim()].filter(Boolean).join("\n"));
+      const combined = sanitizeOpencodeOutput(
+        exitCode === 0 ? output.trim() : [output.trim(), errorOutput.trim()].filter(Boolean).join("\n")
+      );
       resolve({ output: combined, exitCode, command: [opencodeBin, ...args].join(" ") });
     });
   });
