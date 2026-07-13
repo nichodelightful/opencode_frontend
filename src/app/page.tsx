@@ -26,7 +26,7 @@ export default function Home() {
   ]);
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
-  const [selectedModel, setSelectedModel] = useState("default");
+  const [selectedModel, setSelectedModel] = useState("opencode-go/deepseek-v4-flash");
   const [customModel, setCustomModel] = useState("");
   const [input, setInput] = useState("");
   const [isBusy, setIsBusy] = useState(false);
@@ -167,7 +167,7 @@ export default function Home() {
                 onChange={(event) => setCustomModel(event.target.value)}
               />
             ) : null}
-            <p className="text-xs leading-5 text-black/50">不確定就選預設。自訂時請填 opencode 支援的 provider/model。</p>
+            <p className="text-xs leading-5 text-black/50">Go 訂閱請選 opencode-go/*。若選 opencode/* 會走 Zen 餘額。</p>
           </div>
 
           <div className="mt-6 space-y-3">

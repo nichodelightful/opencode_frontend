@@ -39,7 +39,7 @@ Edit `.env` and set your Mac opencode credential directory:
 WORKSPACE_ROOT=/data/workspaces
 OPENCODE_BIN=opencode
 OPENCODE_AUTH_DIR=/Users/YOUR_NAME/.local/share/opencode
-OPENCODE_MODEL=
+OPENCODE_MODEL=opencode-go/deepseek-v4-flash
 OPENCODE_MODEL_OPTIONS=
 OPENCODE_TIMEOUT_MS=180000
 APP_SECRET=change-me
@@ -126,7 +126,7 @@ EC2 `.env` example:
 WORKSPACE_ROOT=/data/workspaces
 OPENCODE_BIN=opencode
 OPENCODE_AUTH_DIR=/home/ubuntu/.local/share/opencode
-OPENCODE_MODEL=
+OPENCODE_MODEL=opencode-go/deepseek-v4-flash
 OPENCODE_MODEL_OPTIONS=
 OPENCODE_TIMEOUT_MS=180000
 APP_SECRET=change-me
@@ -154,8 +154,8 @@ For real family usage, put Cloudflare Tunnel and Cloudflare Access in front inst
 | `WORKSPACE_ROOT` | Container path for uploaded files and session workspaces. Keep `/data/workspaces` for Docker. |
 | `OPENCODE_BIN` | opencode executable path. Usually `opencode`. |
 | `OPENCODE_AUTH_DIR` | Host path containing `auth.json`, mounted into the container. |
-| `OPENCODE_MODEL` | Optional model override. Leave blank to use opencode default. |
-| `OPENCODE_MODEL_OPTIONS` | Optional comma-separated model list override. Leave blank to use the built-in OpenCode Zen list. |
+| `OPENCODE_MODEL` | Optional server-side default model. Use `opencode-go/<model-id>` for OpenCode Go. |
+| `OPENCODE_MODEL_OPTIONS` | Optional comma-separated model list override. Leave blank to use the built-in OpenCode Go list. |
 | `OPENCODE_TIMEOUT_MS` | Maximum time for one `opencode run` request. Default is 180000. |
 | `APP_SECRET` | Reserved for future app auth/session features. |
 
