@@ -1,7 +1,7 @@
 services:
   app:
     build: .
-    container_name: family-ai-workbench
+    container_name: ai-chatbox
     restart: unless-stopped
     env_file:
       - .env
@@ -9,10 +9,12 @@ services:
       NODE_ENV: production
       WORKSPACE_ROOT: /data/workspaces
       OPENCODE_BIN: ${OPENCODE_BIN:-opencode}
+      OPENCODE_MODEL: ${OPENCODE_MODEL:-}
     ports:
       - "3000:3000"
     volumes:
       - workspaces:/data/workspaces
+      - ${OPENCODE_AUTH_DIR}:/home/nextjs/.local/share/opencode:ro
 
 volumes:
   workspaces:

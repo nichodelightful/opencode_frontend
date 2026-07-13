@@ -1,93 +1,170 @@
-# Family AI Workbench
+# AI Chatbox
 
-ChatGPT-style web UI for family AI tasks. The MVP runs as one Next.js container on EC2 and includes both the web page and API routes.
+ChatGPT-style web UI backed by `opencode run`. The app runs as one Next.js container and uses your existing OpenCode Zen credential from `~/.local/share/opencode/auth.json`.
 
-## Current Shape
-
-- `src/app/page.tsx`: chat UI with drag-and-drop upload.
-- `src/app/api/upload/route.ts`: stores uploaded files in a per-session workspace.
-- `src/app/api/chat/route.ts`: mock chat endpoint with a clear TODO for the future opencode executor.
-- `src/lib/workspace.ts`: workspace/session helpers.
-- `Dockerfile` and `docker-compose.yml`: EC2 container deployment baseline.
-
-## Runtime Plan
+## Architecture
 
 ```text
 Browser
-  -> Cloudflare Access / Tunnel
-  -> EC2 Docker container
-  -> Next.js Web + API
-  -> /data/workspaces/<session>/uploads
-  -> future opencode executor
+  -> Next.js Web UI
+  -> /api/upload stores files in /data/workspaces/<session>/uploads
+  -> /api/chat runs opencode run --dir /data/workspaces/<session>
+  -> opencode reads mounted auth.json from ~/.local/share/opencode
 ```
 
-This starts as one service. If execution becomes slow or needs stronger isolation, split the opencode runner into a separate worker container later.
+The first version is non-streaming: the browser waits until `opencode run` completes, then shows the result.
 
-## Local Development
+## Mac Local Test
+
+Install and login to opencode on your Mac first:
 
 ```bash
-npm install
-npm run dev
+brew install anomalyco/tap/opencode
+opencode auth login
+opencode auth list
+opencode run "用繁體中文回答：opencode 可以正常使用嗎？"
 ```
 
-Open `http://localhost:3000`.
-
-## Docker
-
-Create your local env file first:
+Clone and configure this app:
 
 ```bash
+git clone https://github.com/nichodelightful/opencode_frontend.git
+cd opencode_frontend
+cp .env.example .env
+```
+
+Edit `.env` and set your Mac opencode credential directory:
+
+```env
+WORKSPACE_ROOT=/data/workspaces
+OPENCODE_BIN=opencode
+OPENCODE_AUTH_DIR=/Users/YOUR_NAME/.local/share/opencode
+OPENCODE_MODEL=
+APP_SECRET=change-me
+```
+
+You can get the correct path with:
+
+```bash
+echo "$HOME/.local/share/opencode"
+```
+
+Run with Docker:
+
+```bash
+docker compose up --build
+```
+
+Open:
+
+```text
+http://localhost:3000
+```
+
+Stop with `Ctrl+C`, or run in background:
+
+```bash
+docker compose up --build -d
+docker compose logs -f
+docker compose down
+```
+
+## EC2 Deployment
+
+Recommended instance for initial testing:
+
+```text
+Ubuntu 24.04 LTS
+t3.medium or t3.large
+30GB+ disk
+```
+
+Install Docker and Compose plugin:
+
+```bash
+sudo apt update
+sudo apt install -y ca-certificates curl gnupg git
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+sudo apt update
+sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo usermod -aG docker $USER
+```
+
+Log out and back in, then verify:
+
+```bash
+docker --version
+docker compose version
+```
+
+Install and login to opencode on EC2:
+
+```bash
+curl -fsSL https://opencode.ai/install | bash
+opencode auth login
+opencode auth list
+opencode run "用繁體中文回答：EC2 的 opencode 可以正常使用嗎？"
+```
+
+Deploy the app:
+
+```bash
+git clone https://github.com/nichodelightful/opencode_frontend.git
+cd opencode_frontend
 cp .env.example .env
 nano .env
 ```
 
-Then run:
+EC2 `.env` example:
+
+```env
+WORKSPACE_ROOT=/data/workspaces
+OPENCODE_BIN=opencode
+OPENCODE_AUTH_DIR=/home/ubuntu/.local/share/opencode
+OPENCODE_MODEL=
+APP_SECRET=change-me
+```
+
+Start:
 
 ```bash
 docker compose up --build -d
+docker compose logs -f
 ```
 
-The app listens on port `3000`. Uploaded files are stored in the named Docker volume `workspaces` at `/data/workspaces` inside the container.
+Open for temporary testing if your security group allows port 3000:
 
-If this host does not have the Docker Compose plugin, use plain Docker for a quick test:
-
-```bash
-docker build -t family-ai-workbench .
-docker run --rm -p 3000:3000 --env-file .env -v family-ai-workspaces:/data/workspaces family-ai-workbench
+```text
+http://EC2_PUBLIC_IP:3000
 ```
 
-## API Keys
+For real family usage, put Cloudflare Tunnel and Cloudflare Access in front instead of exposing port 3000.
 
-Put API keys in `.env` on the EC2 host, never in source code. The container receives these values through `env_file` in `docker-compose.yml`.
+## Environment Variables
 
-Examples:
+| Variable | Purpose |
+| --- | --- |
+| `WORKSPACE_ROOT` | Container path for uploaded files and session workspaces. Keep `/data/workspaces` for Docker. |
+| `OPENCODE_BIN` | opencode executable path. Usually `opencode`. |
+| `OPENCODE_AUTH_DIR` | Host path containing `auth.json`, mounted into the container. |
+| `OPENCODE_MODEL` | Optional model override. Leave blank to use opencode default. |
+| `APP_SECRET` | Reserved for future app auth/session features. |
 
-```bash
-OPENAI_API_KEY=...
-ANTHROPIC_API_KEY=...
-OPENROUTER_API_KEY=...
-```
+## Files
 
-The exact key depends on the provider configured for opencode.
+- `src/app/page.tsx`: chat UI and drag-and-drop upload.
+- `src/app/api/upload/route.ts`: stores uploaded files.
+- `src/app/api/chat/route.ts`: calls `opencode run`.
+- `src/lib/workspace.ts`: session workspace helpers.
+- `Dockerfile`: builds Next.js and installs opencode.
+- `docker-compose.yml`: mounts workspace and opencode auth directory.
 
-## Where opencode Goes
+## Known Limitations
 
-The current `/api/chat` endpoint is intentionally mocked. The intended integration point is `src/app/api/chat/route.ts`.
-
-Recommended MVP approach:
-
-1. Install opencode inside the app image or create a small wrapper script in the image.
-2. Keep `OPENCODE_BIN=opencode` in `.env`, or set it to the wrapper path.
-3. Spawn opencode from `/api/chat`, with the working directory set to the session workspace.
-4. Pass provider keys through environment variables from `.env`.
-
-Later, if isolation matters, move opencode into a separate worker container and let the Next.js API queue jobs for it.
-
-## Next Steps
-
-1. Replace the mock `/api/chat` response with an opencode subprocess scoped to the session workspace.
-2. Add Server-Sent Events so opencode output streams back to the browser.
-3. Add output file listing and download links.
-4. Put Cloudflare Access in front and use its identity headers for family member separation.
-5. Add cleanup for old workspace files.
-# opencode_frontend
+- Responses are not streamed yet.
+- Only basic workspace isolation is implemented.
+- Output file download UI is not implemented yet.
+- Cloudflare Access identity is not wired into per-user directories yet.

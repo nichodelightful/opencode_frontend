@@ -97,10 +97,10 @@ export default function Home() {
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#fff8ed,transparent_34%),linear-gradient(135deg,#f7f2ea,#efe3d2)] px-4 py-6 text-ink sm:px-8">
       <section className="mx-auto grid min-h-[calc(100vh-48px)] max-w-7xl gap-5 lg:grid-cols-[320px_1fr]">
         <aside className="rounded-[2rem] border border-black/10 bg-white/55 p-5 shadow-soft backdrop-blur">
-          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-moss">Family AI</p>
-          <h1 className="mt-4 text-3xl font-semibold leading-tight">給家人用的 AI 工作台</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.28em] text-moss">AI Chatbox</p>
+          <h1 className="mt-4 text-3xl font-semibold leading-tight">簡單好用的 AI 聊天盒</h1>
           <p className="mt-3 text-sm leading-6 text-black/65">
-            先做成 EC2 上的一個 Next.js container，同時提供網頁和 API。檔案會放進每次對話的 workspace，之後接 opencode 執行。
+            這個網頁會把訊息和上傳檔案交給 opencode 處理，讓不熟 terminal 的使用者也能直接操作。
           </p>
 
           <button

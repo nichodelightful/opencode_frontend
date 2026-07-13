@@ -19,6 +19,7 @@ ENV WORKSPACE_ROOT=/data/workspaces
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 RUN mkdir -p /data/workspaces && chown -R nextjs:nodejs /data
+RUN npm install -g opencode-ai
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
