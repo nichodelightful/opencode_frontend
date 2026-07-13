@@ -1,0 +1,18 @@
+services:
+  app:
+    build: .
+    container_name: family-ai-workbench
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      WORKSPACE_ROOT: /data/workspaces
+      OPENCODE_BIN: ${OPENCODE_BIN:-opencode}
+    ports:
+      - "3000:3000"
+    volumes:
+      - workspaces:/data/workspaces
+
+volumes:
+  workspaces:
