@@ -10,6 +10,7 @@ function runOpencode(sessionRoot: string, message: string, files: string[] = [])
   return new Promise<{ output: string; exitCode: number | null; command: string }>((resolve, reject) => {
     const opencodeBin = process.env.OPENCODE_BIN || "opencode";
     const model = process.env.OPENCODE_MODEL?.trim();
+    const timeoutMs = Number(process.env.OPENCODE_TIMEOUT_MS || 180000);
     const args = ["run", "--dir", sessionRoot, "--auto"];
 
     if (model) {
@@ -35,6 +36,11 @@ function runOpencode(sessionRoot: string, message: string, files: string[] = [])
       shell: false
     });
 
+    const timeout = setTimeout(() => {
+      child.kill("SIGTERM");
+      reject(new Error(`opencode timed out after ${timeoutMs}ms.`));
+    }, timeoutMs);
+
     let output = "";
     let errorOutput = "";
 
@@ -46,8 +52,12 @@ function runOpencode(sessionRoot: string, message: string, files: string[] = [])
       errorOutput += chunk.toString();
     });
 
-    child.on("error", reject);
+    child.on("error", (error) => {
+      clearTimeout(timeout);
+      reject(error);
+    });
     child.on("close", (exitCode) => {
+      clearTimeout(timeout);
       const combined = [output.trim(), errorOutput.trim()].filter(Boolean).join("\n");
       resolve({ output: combined, exitCode, command: [opencodeBin, ...args].join(" ") });
     });
@@ -67,7 +77,18 @@ export async function POST(request: Request) {
   let result: Awaited<ReturnType<typeof runOpencode>>;
 
   try {
+    console.log("Starting opencode", {
+      sessionId,
+      sessionRoot,
+      fileCount: body.files?.length || 0,
+      model: process.env.OPENCODE_MODEL || "default"
+    });
     result = await runOpencode(sessionRoot, message, body.files || []);
+    console.log("Finished opencode", {
+      sessionId,
+      exitCode: result.exitCode,
+      outputLength: result.output.length
+    });
   } catch (error) {
     const detail = error instanceof Error ? error.message : "Unknown opencode spawn error.";
     console.error("Failed to start opencode", { detail, sessionRoot });

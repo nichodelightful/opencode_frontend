@@ -69,7 +69,12 @@ export default function Home() {
     if (!message || isBusy) return;
 
     setInput("");
-    setMessages((current) => [...current, { id: crypto.randomUUID(), role: "user", content: message }]);
+    const pendingId = crypto.randomUUID();
+    setMessages((current) => [
+      ...current,
+      { id: crypto.randomUUID(), role: "user", content: message },
+      { id: pendingId, role: "assistant", content: "opencode 處理中，這一版會等完整結果回來後一次顯示。" }
+    ]);
     setIsBusy(true);
 
     try {
@@ -82,12 +87,13 @@ export default function Home() {
       if (!response.ok) throw new Error([data.error, data.detail].filter(Boolean).join("\n") || "Chat failed.");
 
       setSessionId(data.sessionId);
-      setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: data.reply }]);
+      setMessages((current) => current.map((item) => (item.id === pendingId ? { ...item, content: data.reply } : item)));
     } catch (error) {
-      setMessages((current) => [
-        ...current,
-        { id: crypto.randomUUID(), role: "assistant", content: error instanceof Error ? error.message : "Chat failed." }
-      ]);
+      setMessages((current) =>
+        current.map((item) =>
+          item.id === pendingId ? { ...item, content: error instanceof Error ? error.message : "Chat failed." } : item
+        )
+      );
     } finally {
       setIsBusy(false);
     }

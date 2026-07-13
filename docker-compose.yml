@@ -11,6 +11,7 @@ services:
       WORKSPACE_ROOT: /data/workspaces
       OPENCODE_BIN: ${OPENCODE_BIN:-opencode}
       OPENCODE_MODEL: ${OPENCODE_MODEL:-}
+      OPENCODE_TIMEOUT_MS: ${OPENCODE_TIMEOUT_MS:-180000}
     ports:
       - "3000:3000"
     volumes:
