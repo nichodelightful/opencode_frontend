@@ -40,6 +40,7 @@ WORKSPACE_ROOT=/data/workspaces
 OPENCODE_BIN=opencode
 OPENCODE_AUTH_DIR=/Users/YOUR_NAME/.local/share/opencode
 OPENCODE_MODEL=
+OPENCODE_MODEL_OPTIONS=opencode/grok-code-fast-1
 OPENCODE_TIMEOUT_MS=180000
 APP_SECRET=change-me
 ```
@@ -126,6 +127,7 @@ WORKSPACE_ROOT=/data/workspaces
 OPENCODE_BIN=opencode
 OPENCODE_AUTH_DIR=/home/ubuntu/.local/share/opencode
 OPENCODE_MODEL=
+OPENCODE_MODEL_OPTIONS=opencode/grok-code-fast-1
 OPENCODE_TIMEOUT_MS=180000
 APP_SECRET=change-me
 ```
@@ -153,6 +155,7 @@ For real family usage, put Cloudflare Tunnel and Cloudflare Access in front inst
 | `OPENCODE_BIN` | opencode executable path. Usually `opencode`. |
 | `OPENCODE_AUTH_DIR` | Host path containing `auth.json`, mounted into the container. |
 | `OPENCODE_MODEL` | Optional model override. Leave blank to use opencode default. |
+| `OPENCODE_MODEL_OPTIONS` | Comma-separated model list shown in the UI dropdown. |
 | `OPENCODE_TIMEOUT_MS` | Maximum time for one `opencode run` request. Default is 180000. |
 | `APP_SECRET` | Reserved for future app auth/session features. |
 

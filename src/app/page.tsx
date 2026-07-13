@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 
 type Message = {
   id: string;
@@ -25,9 +25,31 @@ export default function Home() {
     }
   ]);
   const [uploads, setUploads] = useState<Upload[]>([]);
+  const [modelOptions, setModelOptions] = useState<string[]>([]);
+  const [selectedModel, setSelectedModel] = useState("default");
+  const [customModel, setCustomModel] = useState("");
   const [input, setInput] = useState("");
   const [isBusy, setIsBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    fetch("/api/models")
+      .then((response) => response.json())
+      .then((data) => {
+        if (!cancelled && Array.isArray(data.models)) setModelOptions(data.models);
+      })
+      .catch(() => {
+        if (!cancelled) setModelOptions([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const activeModel = selectedModel === "custom" ? customModel.trim() : selectedModel === "default" ? "" : selectedModel;
 
   async function uploadFiles(files: FileList | File[]) {
     const picked = Array.from(files);
@@ -81,7 +103,7 @@ export default function Home() {
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sessionId, message, files: uploads.map((upload) => upload.path) })
+        body: JSON.stringify({ sessionId, message, model: activeModel, files: uploads.map((upload) => upload.path) })
       });
       const data = await response.json();
       if (!response.ok) throw new Error([data.error, data.detail].filter(Boolean).join("\n") || "Chat failed.");
@@ -118,6 +140,35 @@ export default function Home() {
             選擇檔案上傳
           </button>
           <input ref={fileInputRef} className="hidden" multiple type="file" onChange={(event) => event.target.files && uploadFiles(event.target.files)} />
+
+          <div className="mt-6 space-y-3">
+            <label className="text-sm font-semibold" htmlFor="model-select">
+              使用模型
+            </label>
+            <select
+              id="model-select"
+              className="w-full rounded-2xl border border-black/10 bg-white/80 px-4 py-3 text-sm outline-none transition focus:border-clay"
+              value={selectedModel}
+              onChange={(event) => setSelectedModel(event.target.value)}
+            >
+              <option value="default">opencode 預設模型</option>
+              {modelOptions.map((model) => (
+                <option key={model} value={model}>
+                  {model}
+                </option>
+              ))}
+              <option value="custom">自訂模型名稱</option>
+            </select>
+            {selectedModel === "custom" ? (
+              <input
+                className="w-full rounded-2xl border border-black/10 bg-white/80 px-4 py-3 text-sm outline-none transition placeholder:text-black/40 focus:border-clay"
+                placeholder="例如：opencode/grok-code-fast-1"
+                value={customModel}
+                onChange={(event) => setCustomModel(event.target.value)}
+              />
+            ) : null}
+            <p className="text-xs leading-5 text-black/50">不確定就選預設。自訂時請填 opencode 支援的 provider/model。</p>
+          </div>
 
           <div className="mt-6 space-y-3">
             <p className="text-sm font-semibold">已上傳檔案</p>

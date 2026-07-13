@@ -6,10 +6,38 @@ import path from "path";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 
-function runOpencode(sessionRoot: string, message: string, files: string[] = []) {
+function sanitizeOpencodeOutput(value: string) {
+  return value
+    .replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, "")
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+
+      if (!trimmed) return true;
+      if (trimmed.startsWith("<system-reminder>")) return false;
+      if (trimmed.startsWith("</system-reminder>")) return false;
+      if (/^>\s+\S+\s+·\s+/.test(trimmed)) return false;
+      if (/^[$%◈]\s+/.test(trimmed)) return false;
+
+      return true;
+    })
+    .join("\n")
+    .trim();
+}
+
+function cleanModel(value: string | undefined) {
+  const model = value?.trim();
+
+  if (!model) return undefined;
+  if (model.length > 200 || /[\r\n]/.test(model)) return undefined;
+
+  return model;
+}
+
+function runOpencode(sessionRoot: string, message: string, files: string[] = [], modelOverride?: string) {
   return new Promise<{ output: string; exitCode: number | null; command: string }>((resolve, reject) => {
     const opencodeBin = process.env.OPENCODE_BIN || "opencode";
-    const model = process.env.OPENCODE_MODEL?.trim();
+    const model = cleanModel(modelOverride) || cleanModel(process.env.OPENCODE_MODEL);
     const timeoutMs = Number(process.env.OPENCODE_TIMEOUT_MS || 180000);
     const args = ["run", "--dir", sessionRoot, "--auto"];
 
@@ -62,14 +90,14 @@ function runOpencode(sessionRoot: string, message: string, files: string[] = [])
     });
     child.on("close", (exitCode) => {
       clearTimeout(timeout);
-      const combined = [output.trim(), errorOutput.trim()].filter(Boolean).join("\n");
+      const combined = sanitizeOpencodeOutput([output.trim(), errorOutput.trim()].filter(Boolean).join("\n"));
       resolve({ output: combined, exitCode, command: [opencodeBin, ...args].join(" ") });
     });
   });
 }
 
 export async function POST(request: Request) {
-  const body = (await request.json()) as { message?: string; sessionId?: string; files?: string[] };
+  const body = (await request.json()) as { message?: string; sessionId?: string; files?: string[]; model?: string };
   const sessionId = safeSessionId(body.sessionId);
   const message = body.message?.trim();
 
@@ -85,9 +113,9 @@ export async function POST(request: Request) {
       sessionId,
       sessionRoot,
       fileCount: body.files?.length || 0,
-      model: process.env.OPENCODE_MODEL || "default"
+      model: cleanModel(body.model) || process.env.OPENCODE_MODEL || "default"
     });
-    result = await runOpencode(sessionRoot, message, body.files || []);
+    result = await runOpencode(sessionRoot, message, body.files || [], body.model);
     console.log("Finished opencode", {
       sessionId,
       exitCode: result.exitCode,
