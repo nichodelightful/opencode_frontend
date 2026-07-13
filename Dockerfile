@@ -16,9 +16,10 @@ ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 ENV WORKSPACE_ROOT=/data/workspaces
+ENV HOME=/home/nextjs
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
-RUN mkdir -p /data/workspaces && chown -R nextjs:nodejs /data
+RUN mkdir -p /data/workspaces /home/nextjs/.local/share/opencode && chown -R nextjs:nodejs /data /home/nextjs
 RUN npm install -g opencode-ai
 
 COPY --from=builder /app/public ./public

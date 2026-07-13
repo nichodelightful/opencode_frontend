@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 export const maxDuration = 300;
 
 function runOpencode(sessionRoot: string, message: string, files: string[] = []) {
-  return new Promise<{ output: string; exitCode: number | null }>((resolve, reject) => {
+  return new Promise<{ output: string; exitCode: number | null; command: string }>((resolve, reject) => {
     const opencodeBin = process.env.OPENCODE_BIN || "opencode";
     const model = process.env.OPENCODE_MODEL?.trim();
     const args = ["run", "--dir", sessionRoot, "--auto"];
@@ -49,7 +49,7 @@ function runOpencode(sessionRoot: string, message: string, files: string[] = [])
     child.on("error", reject);
     child.on("close", (exitCode) => {
       const combined = [output.trim(), errorOutput.trim()].filter(Boolean).join("\n");
-      resolve({ output: combined, exitCode });
+      resolve({ output: combined, exitCode, command: [opencodeBin, ...args].join(" ") });
     });
   });
 }
@@ -64,13 +64,36 @@ export async function POST(request: Request) {
   }
 
   const { sessionRoot } = await ensureSessionDirs(sessionId);
-  const result = await runOpencode(sessionRoot, message, body.files || []);
+  let result: Awaited<ReturnType<typeof runOpencode>>;
+
+  try {
+    result = await runOpencode(sessionRoot, message, body.files || []);
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : "Unknown opencode spawn error.";
+    console.error("Failed to start opencode", { detail, sessionRoot });
+
+    return NextResponse.json(
+      {
+        error: "Failed to start opencode.",
+        detail
+      },
+      { status: 500 }
+    );
+  }
 
   if (result.exitCode !== 0) {
+    console.error("opencode failed", {
+      exitCode: result.exitCode,
+      command: result.command,
+      output: result.output,
+      sessionRoot
+    });
+
     return NextResponse.json(
       {
         error: "opencode failed.",
-        detail: result.output || `opencode exited with code ${result.exitCode}`
+        detail: result.output || `opencode exited with code ${result.exitCode}`,
+        exitCode: result.exitCode
       },
       { status: 500 }
     );

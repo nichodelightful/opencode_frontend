@@ -168,3 +168,20 @@ For real family usage, put Cloudflare Tunnel and Cloudflare Access in front inst
 - Only basic workspace isolation is implemented.
 - Output file download UI is not implemented yet.
 - Cloudflare Access identity is not wired into per-user directories yet.
+
+## Troubleshooting
+
+If the browser shows `opencode failed.`, check the real error with:
+
+```bash
+docker compose logs -f
+```
+
+Also verify the mounted credential directory:
+
+```bash
+echo "$HOME/.local/share/opencode"
+ls "$HOME/.local/share/opencode/auth.json"
+```
+
+Your `.env` must point `OPENCODE_AUTH_DIR` to that host directory, not to `/data/workspaces`.

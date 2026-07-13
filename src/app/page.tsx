@@ -79,7 +79,7 @@ export default function Home() {
         body: JSON.stringify({ sessionId, message, files: uploads.map((upload) => upload.path) })
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Chat failed.");
+      if (!response.ok) throw new Error([data.error, data.detail].filter(Boolean).join("\n") || "Chat failed.");
 
       setSessionId(data.sessionId);
       setMessages((current) => [...current, { id: crypto.randomUUID(), role: "assistant", content: data.reply }]);

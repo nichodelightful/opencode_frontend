@@ -7,6 +7,7 @@ services:
       - .env
     environment:
       NODE_ENV: production
+      HOME: /home/nextjs
       WORKSPACE_ROOT: /data/workspaces
       OPENCODE_BIN: ${OPENCODE_BIN:-opencode}
       OPENCODE_MODEL: ${OPENCODE_MODEL:-}
@@ -14,7 +15,7 @@ services:
       - "3000:3000"
     volumes:
       - workspaces:/data/workspaces
-      - ${OPENCODE_AUTH_DIR}:/home/nextjs/.local/share/opencode:ro
+      - ${OPENCODE_AUTH_DIR}:/home/nextjs/.local/share/opencode
 
 volumes:
   workspaces:
