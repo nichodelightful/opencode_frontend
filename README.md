@@ -13,7 +13,7 @@ Browser
   -> opencode reads mounted auth.json from ~/.local/share/opencode
 ```
 
-The first version is non-streaming: the browser waits until `opencode run` completes, then shows the result.
+Chat responses stream back to the browser while `opencode run` is still working. Generated files are listed after the run completes.
 
 ## Mac Local Test
 
@@ -181,7 +181,7 @@ For real family usage, put Cloudflare Tunnel and Cloudflare Access in front inst
 
 ## Known Limitations
 
-- Responses are not streamed yet.
+- Streaming is line-oriented from the `opencode run` process, so some output may still be finalized or cleaned up at the end of the request.
 - Only basic workspace isolation is implemented.
 - Complex Office formatting, animations, comments, and tracked changes may not be preserved perfectly.
 - Cloudflare Access identity is not wired into per-user directories yet.

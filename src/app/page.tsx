@@ -122,17 +122,69 @@ export default function Home() {
     setIsBusy(true);
 
     try {
-      const response = await fetch("/api/chat", {
+      const response = await fetch("/api/chat/stream", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ sessionId, message, model: activeModel, files: uploads.map((upload) => upload.path) })
       });
-      const data = await response.json();
-      if (!response.ok) throw new Error([data.error, data.detail].filter(Boolean).join("\n") || "Chat failed.");
 
-      setSessionId(data.sessionId);
-      setMessages((current) => current.map((item) => (item.id === pendingId ? { ...item, content: data.reply } : item)));
-      await refreshOutputs(data.sessionId);
+      if (!response.ok || !response.body) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error([data.error, data.detail].filter(Boolean).join("\n") || "Chat failed.");
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let streamedText = "";
+      let finalSessionId = sessionId;
+
+      const handleEvent = (eventName: string, rawData: string) => {
+        const data = JSON.parse(rawData) as { sessionId?: string; chunk?: string; output?: string; detail?: string };
+
+        if (eventName === "session" && data.sessionId) {
+          finalSessionId = data.sessionId;
+          setSessionId(data.sessionId);
+          return;
+        }
+
+        if (eventName === "chunk" && data.chunk) {
+          streamedText += data.chunk;
+          setMessages((current) => current.map((item) => (item.id === pendingId ? { ...item, content: streamedText } : item)));
+          return;
+        }
+
+        if (eventName === "done") {
+          streamedText = data.output || streamedText || "opencode completed without text output.";
+          setMessages((current) => current.map((item) => (item.id === pendingId ? { ...item, content: streamedText } : item)));
+          if (data.sessionId) finalSessionId = data.sessionId;
+          return;
+        }
+
+        if (eventName === "error") {
+          throw new Error(data.detail || "Chat failed.");
+        }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split("\n\n");
+        buffer = events.pop() || "";
+
+        for (const eventBlock of events) {
+          const eventLine = eventBlock.split("\n").find((line) => line.startsWith("event: "));
+          const dataLine = eventBlock.split("\n").find((line) => line.startsWith("data: "));
+
+          if (!eventLine || !dataLine) continue;
+
+          handleEvent(eventLine.slice(7), dataLine.slice(6));
+        }
+      }
+
+      await refreshOutputs(finalSessionId);
     } catch (error) {
       setMessages((current) =>
         current.map((item) =>
