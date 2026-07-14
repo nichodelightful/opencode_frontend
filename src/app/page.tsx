@@ -117,7 +117,7 @@ export default function Home() {
     setMessages((current) => [
       ...current,
       { id: crypto.randomUUID(), role: "user", content: message },
-      { id: pendingId, role: "assistant", content: "opencode 處理中，這一版會等完整結果回來後一次顯示。" }
+      { id: pendingId, role: "assistant", content: "opencode 已開始處理，會盡量即時顯示可用的回覆內容。" }
     ]);
     setIsBusy(true);
 
@@ -140,7 +140,7 @@ export default function Home() {
       let finalSessionId = sessionId;
 
       const handleEvent = (eventName: string, rawData: string) => {
-        const data = JSON.parse(rawData) as { sessionId?: string; chunk?: string; output?: string; detail?: string };
+        const data = JSON.parse(rawData) as { sessionId?: string; chunk?: string; output?: string; detail?: string; message?: string };
 
         if (eventName === "session" && data.sessionId) {
           finalSessionId = data.sessionId;
@@ -151,6 +151,12 @@ export default function Home() {
         if (eventName === "chunk" && data.chunk) {
           streamedText += data.chunk;
           setMessages((current) => current.map((item) => (item.id === pendingId ? { ...item, content: streamedText } : item)));
+          return;
+        }
+
+        if (eventName === "status" && data.message && !streamedText) {
+          const statusMessage = data.message;
+          setMessages((current) => current.map((item) => (item.id === pendingId ? { ...item, content: statusMessage } : item)));
           return;
         }
 

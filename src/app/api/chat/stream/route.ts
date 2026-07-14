@@ -37,6 +37,7 @@ export async function POST(request: Request) {
       let rawOutput = "";
       let rawError = "";
       let sentOutput = "";
+      const startedAt = Date.now();
 
       controller.enqueue(encoder.encode(sse("session", { sessionId })));
       console.log("Starting streaming opencode", {
@@ -64,6 +65,17 @@ export async function POST(request: Request) {
         controller.close();
       }, timeoutMs);
 
+      const statusInterval = setInterval(() => {
+        const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
+        controller.enqueue(
+          encoder.encode(
+            sse("status", {
+              message: `opencode 正在處理中，目前已執行 ${elapsedSeconds} 秒。若正在分析或修改 Office 檔，可能需要幾分鐘。`
+            })
+          )
+        );
+      }, 5000);
+
       child.stdout.on("data", (chunk) => {
         rawOutput += chunk.toString();
         emitOutput();
@@ -75,12 +87,14 @@ export async function POST(request: Request) {
 
       child.on("error", (error) => {
         clearTimeout(timeout);
+        clearInterval(statusInterval);
         controller.enqueue(encoder.encode(sse("error", { detail: sanitizeOpencodeOutput(error.message) })));
         controller.close();
       });
 
       child.on("close", (exitCode) => {
         clearTimeout(timeout);
+        clearInterval(statusInterval);
         const finalOutput = sanitizeOpencodeOutput(
           exitCode === 0 ? rawOutput.trim() : [rawOutput.trim(), rawError.trim()].filter(Boolean).join("\n")
         );
