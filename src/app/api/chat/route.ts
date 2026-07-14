@@ -8,7 +8,7 @@ export const maxDuration = 300;
 
 function sanitizeOpencodeOutput(value: string) {
   return value
-    .replace(/<system-reminder>[\s\S]*?<\/system-reminder>/g, "")
+    .replace(/<system-reminder\b[^>]*>[\s\S]*?<\/system-reminder>/gi, "")
     .replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, "")
     .split("\n")
     .filter((line) => {
@@ -144,6 +144,13 @@ export async function POST(request: Request) {
       output: result.output,
       sessionRoot
     });
+
+    if (result.output) {
+      return NextResponse.json({
+        sessionId,
+        reply: `${result.output}\n\n[注意] opencode 有回傳內容，但其中某個工具或子步驟失敗了。`
+      });
+    }
 
     return NextResponse.json(
       {
