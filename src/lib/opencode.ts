@@ -52,12 +52,22 @@ export function buildTaskMessage(message: string, sessionRoot: string) {
   ].join("\n");
 }
 
-export function createOpencodeArgs(sessionRoot: string, message: string, files: string[] = [], modelOverride?: string) {
+export function createOpencodeArgs(
+  sessionRoot: string,
+  message: string,
+  files: string[] = [],
+  modelOverride?: string,
+  options: { format?: "json" } = {}
+) {
   const model = cleanModel(modelOverride) || cleanModel(process.env.OPENCODE_MODEL);
   const args = ["run", buildTaskMessage(message, sessionRoot), "--dir", sessionRoot, "--auto"];
 
   if (model) {
     args.push("--model", model);
+  }
+
+  if (options.format) {
+    args.push("--format", options.format);
   }
 
   for (const file of files) {

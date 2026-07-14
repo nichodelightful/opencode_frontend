@@ -10,6 +10,31 @@ function sse(event: string, data: unknown) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
 
+function extractTextFromEvent(value: unknown, parentKey = ""): string[] {
+  if (!value) return [];
+
+  if (typeof value === "string") {
+    return ["text", "delta", "content", "output"].includes(parentKey) ? [value] : [];
+  }
+
+  if (Array.isArray(value)) {
+    return value.flatMap((item) => extractTextFromEvent(item, parentKey));
+  }
+
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    const role = typeof record.role === "string" ? record.role : "";
+    const type = typeof record.type === "string" ? record.type : "";
+
+    if (["user", "system"].includes(role)) return [];
+    if (type.toLowerCase().includes("tool")) return [];
+
+    return Object.entries(record).flatMap(([key, item]) => extractTextFromEvent(item, key));
+  }
+
+  return [];
+}
+
 export async function POST(request: Request) {
   const body = (await request.json()) as { message?: string; sessionId?: string; files?: string[]; model?: string };
   const sessionId = safeSessionId(body.sessionId);
@@ -26,7 +51,7 @@ export async function POST(request: Request) {
     start(controller) {
       const opencodeBin = process.env.OPENCODE_BIN || "opencode";
       const timeoutMs = Number(process.env.OPENCODE_TIMEOUT_MS || 600000);
-      const args = createOpencodeArgs(sessionRoot, message, body.files || [], body.model);
+      const args = createOpencodeArgs(sessionRoot, message, body.files || [], body.model, { format: "json" });
       const child = spawn(opencodeBin, args, {
         cwd: sessionRoot,
         env: process.env,
@@ -37,6 +62,7 @@ export async function POST(request: Request) {
       let rawOutput = "";
       let rawError = "";
       let sentOutput = "";
+      let jsonBuffer = "";
       const startedAt = Date.now();
 
       controller.enqueue(encoder.encode(sse("session", { sessionId })));
@@ -47,13 +73,36 @@ export async function POST(request: Request) {
         model: cleanModel(body.model) || process.env.OPENCODE_MODEL || "default"
       });
 
-      const emitOutput = () => {
-        const cleaned = sanitizeOpencodeOutput(rawOutput);
-        if (cleaned.length <= sentOutput.length) return;
+      const emitText = (candidate: string) => {
+        const cleaned = sanitizeOpencodeOutput(candidate);
+        if (!cleaned) return;
 
-        const chunk = cleaned.slice(sentOutput.length);
-        sentOutput = cleaned;
+        if (cleaned.startsWith(sentOutput)) {
+          const chunk = cleaned.slice(sentOutput.length);
+          if (!chunk) return;
+          sentOutput = cleaned;
+          controller.enqueue(encoder.encode(sse("chunk", { chunk })));
+          return;
+        }
+
+        if (sentOutput.includes(cleaned)) return;
+
+        const chunk = sentOutput ? `\n${cleaned}` : cleaned;
+        sentOutput += chunk;
         controller.enqueue(encoder.encode(sse("chunk", { chunk })));
+      };
+
+      const processJsonLine = (line: string) => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        try {
+          const event = JSON.parse(trimmed) as unknown;
+          const text = extractTextFromEvent(event).join("");
+          emitText(text);
+        } catch {
+          emitText(trimmed);
+        }
       };
 
       const timeout = setTimeout(() => {
@@ -77,8 +126,13 @@ export async function POST(request: Request) {
       }, 5000);
 
       child.stdout.on("data", (chunk) => {
-        rawOutput += chunk.toString();
-        emitOutput();
+        const text = chunk.toString();
+        rawOutput += text;
+        jsonBuffer += text;
+
+        const lines = jsonBuffer.split("\n");
+        jsonBuffer = lines.pop() || "";
+        lines.forEach(processJsonLine);
       });
 
       child.stderr.on("data", (chunk) => {
@@ -95,9 +149,11 @@ export async function POST(request: Request) {
       child.on("close", (exitCode) => {
         clearTimeout(timeout);
         clearInterval(statusInterval);
-        const finalOutput = sanitizeOpencodeOutput(
-          exitCode === 0 ? rawOutput.trim() : [rawOutput.trim(), rawError.trim()].filter(Boolean).join("\n")
+        if (jsonBuffer.trim()) processJsonLine(jsonBuffer);
+        const fallbackOutput = sanitizeOpencodeOutput(
+          [rawOutput.trim(), rawError.trim()].filter(Boolean).join("\n")
         );
+        const finalOutput = sentOutput || fallbackOutput;
         console.log("Finished streaming opencode", { sessionId, exitCode, outputLength: finalOutput.length });
 
         controller.enqueue(
