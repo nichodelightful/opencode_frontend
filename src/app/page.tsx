@@ -15,6 +15,13 @@ type Upload = {
   type: string;
 };
 
+type OutputFile = {
+  name: string;
+  path: string;
+  size: number;
+  updatedAt: string;
+};
+
 export default function Home() {
   const [sessionId, setSessionId] = useState<string>();
   const [messages, setMessages] = useState<Message[]>([
@@ -25,6 +32,7 @@ export default function Home() {
     }
   ]);
   const [uploads, setUploads] = useState<Upload[]>([]);
+  const [outputs, setOutputs] = useState<OutputFile[]>([]);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState("opencode-go/deepseek-v4-flash");
   const [customModel, setCustomModel] = useState("");
@@ -50,6 +58,20 @@ export default function Home() {
   }, []);
 
   const activeModel = selectedModel === "custom" ? customModel.trim() : selectedModel === "default" ? "" : selectedModel;
+
+  async function refreshOutputs(nextSessionId = sessionId) {
+    if (!nextSessionId) {
+      setOutputs([]);
+      return;
+    }
+
+    const response = await fetch(`/api/outputs?sessionId=${encodeURIComponent(nextSessionId)}`);
+    const data = await response.json();
+
+    if (response.ok && Array.isArray(data.outputs)) {
+      setOutputs(data.outputs);
+    }
+  }
 
   async function uploadFiles(files: FileList | File[]) {
     const picked = Array.from(files);
@@ -110,6 +132,7 @@ export default function Home() {
 
       setSessionId(data.sessionId);
       setMessages((current) => current.map((item) => (item.id === pendingId ? { ...item, content: data.reply } : item)));
+      await refreshOutputs(data.sessionId);
     } catch (error) {
       setMessages((current) =>
         current.map((item) =>
@@ -180,6 +203,24 @@ export default function Home() {
                   <p className="truncate font-medium">{upload.name}</p>
                   <p className="mt-1 text-xs text-black/50">{Math.ceil(upload.size / 1024)} KB</p>
                 </div>
+              ))
+            )}
+          </div>
+
+          <div className="mt-6 space-y-3">
+            <p className="text-sm font-semibold">產出檔案</p>
+            {outputs.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-black/15 p-4 text-sm text-black/50">還沒有可下載檔案</p>
+            ) : (
+              outputs.map((output) => (
+                <a
+                  key={output.path}
+                  className="block rounded-2xl bg-white/80 p-3 text-sm transition hover:bg-white"
+                  href={`/api/download?sessionId=${encodeURIComponent(sessionId || "")}&file=${encodeURIComponent(output.name)}`}
+                >
+                  <p className="truncate font-medium text-ink">{output.name}</p>
+                  <p className="mt-1 text-xs text-black/50">下載 · {Math.ceil(output.size / 1024)} KB</p>
+                </a>
               ))
             )}
           </div>

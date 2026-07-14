@@ -37,12 +37,26 @@ function cleanModel(value: string | undefined) {
   return model;
 }
 
+function buildTaskMessage(message: string, sessionRoot: string) {
+  return [
+    message,
+    "",
+    "System instruction for this web app:",
+    `- The session workspace is ${sessionRoot}.`,
+    "- Uploaded source files are in uploads/.",
+    "- If the user asks you to edit, convert, revise, annotate, summarize into a file, or create a Word/Excel/PowerPoint output, save the finished downloadable file in outputs/.",
+    "- Do not overwrite uploaded originals. Create a new file with a clear name such as outputs/revised-original.docx, outputs/updated-deck.pptx, or outputs/analysis.xlsx.",
+    "- For Office files, prefer Python tools when useful: python-docx for .docx, python-pptx for .pptx, and openpyxl for .xlsx.",
+    "- In your final answer, briefly mention any generated output file names."
+  ].join("\n");
+}
+
 function runOpencode(sessionRoot: string, message: string, files: string[] = [], modelOverride?: string) {
   return new Promise<{ output: string; exitCode: number | null; command: string }>((resolve, reject) => {
     const opencodeBin = process.env.OPENCODE_BIN || "opencode";
     const model = cleanModel(modelOverride) || cleanModel(process.env.OPENCODE_MODEL);
     const timeoutMs = Number(process.env.OPENCODE_TIMEOUT_MS || 180000);
-    const args = ["run", message, "--dir", sessionRoot, "--auto"];
+    const args = ["run", buildTaskMessage(message, sessionRoot), "--dir", sessionRoot, "--auto"];
 
     if (model) {
       args.push("--model", model);

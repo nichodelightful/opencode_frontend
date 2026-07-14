@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, readdir, stat, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 
@@ -9,6 +9,13 @@ export type StoredUpload = {
   path: string;
   size: number;
   type: string;
+};
+
+export type OutputFile = {
+  name: string;
+  path: string;
+  size: number;
+  updatedAt: string;
 };
 
 export function createSessionId() {
@@ -49,4 +56,39 @@ export async function storeUpload(sessionId: string, file: File): Promise<Stored
     size: file.size,
     type: file.type || "application/octet-stream"
   };
+}
+
+export async function listOutputs(sessionId: string): Promise<OutputFile[]> {
+  const { outputDir } = await ensureSessionDirs(sessionId);
+  const entries = await readdir(outputDir, { withFileTypes: true });
+  const files = await Promise.all(
+    entries
+      .filter((entry) => entry.isFile())
+      .map(async (entry) => {
+        const filePath = path.join(outputDir, entry.name);
+        const info = await stat(filePath);
+
+        return {
+          name: entry.name,
+          path: filePath,
+          size: info.size,
+          updatedAt: info.mtime.toISOString()
+        };
+      })
+  );
+
+  return files.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+export async function resolveOutputPath(sessionId: string, fileName: string) {
+  const { outputDir } = await ensureSessionDirs(sessionId);
+  const cleanName = path.basename(fileName);
+  const filePath = path.join(outputDir, cleanName);
+  const relativePath = path.relative(outputDir, filePath);
+
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    throw new Error("Invalid output file path.");
+  }
+
+  return filePath;
 }

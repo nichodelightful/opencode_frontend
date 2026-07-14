@@ -9,6 +9,7 @@ Browser
   -> Next.js Web UI
   -> /api/upload stores files in /data/workspaces/<session>/uploads
   -> /api/chat runs opencode run --dir /data/workspaces/<session>
+  -> generated files are saved in /data/workspaces/<session>/outputs
   -> opencode reads mounted auth.json from ~/.local/share/opencode
 ```
 
@@ -62,6 +63,14 @@ Open:
 ```text
 http://localhost:3000
 ```
+
+To create downloadable Office outputs, upload a `.docx`, `.xlsx`, or `.pptx` file and ask for a modified file, for example:
+
+```text
+請幫我把這份投影片改成給主管看的版本，並產生新的 pptx 檔讓我下載。
+```
+
+Generated files appear in the left sidebar under `產出檔案`.
 
 Stop with `Ctrl+C`, or run in background:
 
@@ -164,6 +173,8 @@ For real family usage, put Cloudflare Tunnel and Cloudflare Access in front inst
 - `src/app/page.tsx`: chat UI and drag-and-drop upload.
 - `src/app/api/upload/route.ts`: stores uploaded files.
 - `src/app/api/chat/route.ts`: calls `opencode run`.
+- `src/app/api/outputs/route.ts`: lists generated downloadable files.
+- `src/app/api/download/route.ts`: downloads files from the session `outputs/` directory.
 - `src/lib/workspace.ts`: session workspace helpers.
 - `Dockerfile`: builds Next.js and installs opencode.
 - `docker-compose.yml`: mounts workspace and opencode auth directory.
@@ -172,7 +183,7 @@ For real family usage, put Cloudflare Tunnel and Cloudflare Access in front inst
 
 - Responses are not streamed yet.
 - Only basic workspace isolation is implemented.
-- Output file download UI is not implemented yet.
+- Complex Office formatting, animations, comments, and tracked changes may not be preserved perfectly.
 - Cloudflare Access identity is not wired into per-user directories yet.
 
 ## Troubleshooting
