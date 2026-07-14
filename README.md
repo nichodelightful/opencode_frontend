@@ -42,7 +42,7 @@ OPENCODE_BIN=opencode
 OPENCODE_AUTH_DIR=/Users/YOUR_NAME/.local/share/opencode
 OPENCODE_MODEL=opencode-go/deepseek-v4-flash
 OPENCODE_MODEL_OPTIONS=
-OPENCODE_TIMEOUT_MS=180000
+OPENCODE_TIMEOUT_MS=600000
 APP_SECRET=change-me
 ```
 
@@ -137,7 +137,7 @@ OPENCODE_BIN=opencode
 OPENCODE_AUTH_DIR=/home/ubuntu/.local/share/opencode
 OPENCODE_MODEL=opencode-go/deepseek-v4-flash
 OPENCODE_MODEL_OPTIONS=
-OPENCODE_TIMEOUT_MS=180000
+OPENCODE_TIMEOUT_MS=600000
 APP_SECRET=change-me
 ```
 
@@ -165,7 +165,7 @@ For real family usage, put Cloudflare Tunnel and Cloudflare Access in front inst
 | `OPENCODE_AUTH_DIR` | Host path containing `auth.json`, mounted into the container. |
 | `OPENCODE_MODEL` | Optional server-side default model. Use `opencode-go/<model-id>` for OpenCode Go. |
 | `OPENCODE_MODEL_OPTIONS` | Optional comma-separated model list override. Leave blank to use the built-in OpenCode Go list. |
-| `OPENCODE_TIMEOUT_MS` | Maximum time for one `opencode run` request. Default is 180000. |
+| `OPENCODE_TIMEOUT_MS` | Maximum time for one `opencode run` request. Default is 600000. |
 | `APP_SECRET` | Reserved for future app auth/session features. |
 
 ## Files

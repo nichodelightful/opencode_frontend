@@ -55,7 +55,7 @@ function runOpencode(sessionRoot: string, message: string, files: string[] = [],
   return new Promise<{ output: string; exitCode: number | null; command: string }>((resolve, reject) => {
     const opencodeBin = process.env.OPENCODE_BIN || "opencode";
     const model = cleanModel(modelOverride) || cleanModel(process.env.OPENCODE_MODEL);
-    const timeoutMs = Number(process.env.OPENCODE_TIMEOUT_MS || 180000);
+    const timeoutMs = Number(process.env.OPENCODE_TIMEOUT_MS || 600000);
     const args = ["run", buildTaskMessage(message, sessionRoot), "--dir", sessionRoot, "--auto"];
 
     if (model) {
@@ -139,7 +139,7 @@ export async function POST(request: Request) {
       outputLength: result.output.length
     });
   } catch (error) {
-    const detail = error instanceof Error ? error.message : "Unknown opencode spawn error.";
+    const detail = sanitizeOpencodeOutput(error instanceof Error ? error.message : "Unknown opencode spawn error.");
     console.error("Failed to start opencode", { detail, sessionRoot });
 
     return NextResponse.json(
