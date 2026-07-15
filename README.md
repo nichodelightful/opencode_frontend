@@ -1,6 +1,6 @@
 # AI Chatbox
 
-ChatGPT-style web UI backed by `opencode run`. The app runs as one Next.js container and uses your existing OpenCode Zen credential from `~/.local/share/opencode/auth.json`.
+ChatGPT-style web UI backed by `opencode run`. The app runs as one Next.js container and uses an OpenCode Go `auth.json` mounted into the container.
 
 ## Architecture
 
@@ -10,14 +10,16 @@ Browser
   -> /api/upload stores files in /data/workspaces/<session>/uploads
   -> /api/chat runs opencode run --dir /data/workspaces/<session>
   -> generated files are saved in /data/workspaces/<session>/outputs
-  -> opencode reads mounted auth.json from ~/.local/share/opencode
+  -> opencode reads mounted auth.json from secrets/opencode/auth.json
 ```
 
 Chat responses stream back to the browser while `opencode run` is still working. Generated files are listed after the run completes.
 
 ## Mac Local Test
 
-Install and login to opencode on your Mac first:
+You can either use your existing local opencode login, or use the example `auth.json` flow below. For this app, Docker only needs a valid `auth.json` mounted into the container.
+
+Optional local opencode check:
 
 ```bash
 brew install anomalyco/tap/opencode
@@ -32,24 +34,30 @@ Clone and configure this app:
 git clone https://github.com/nichodelightful/opencode_frontend.git
 cd opencode_frontend
 cp .env.example .env
+cp secrets/opencode/auth.example.json secrets/opencode/auth.json
 ```
 
-Edit `.env` and set your Mac opencode credential directory:
+Edit `secrets/opencode/auth.json` and replace `sk-XXXXXX` with your real OpenCode Go API key:
+
+```json
+{
+  "opencode-go": {
+    "type": "api",
+    "key": "sk-XXXXXX"
+  }
+}
+```
+
+Edit `.env`:
 
 ```env
 WORKSPACE_ROOT=/data/workspaces
 OPENCODE_BIN=opencode
-OPENCODE_AUTH_DIR=/Users/YOUR_NAME/.local/share/opencode
+OPENCODE_AUTH_DIR=./secrets/opencode
 OPENCODE_MODEL=opencode-go/deepseek-v4-flash
 OPENCODE_MODEL_OPTIONS=
 OPENCODE_TIMEOUT_MS=600000
 APP_SECRET=change-me
-```
-
-You can get the correct path with:
-
-```bash
-echo "$HOME/.local/share/opencode"
 ```
 
 Run with Docker:
@@ -111,21 +119,14 @@ docker --version
 docker compose version
 ```
 
-Install and login to opencode on EC2:
-
-```bash
-curl -fsSL https://opencode.ai/install | bash
-opencode auth login
-opencode auth list
-opencode run "用繁體中文回答：EC2 的 opencode 可以正常使用嗎？"
-```
-
 Deploy the app:
 
 ```bash
 git clone https://github.com/nichodelightful/opencode_frontend.git
 cd opencode_frontend
 cp .env.example .env
+cp secrets/opencode/auth.example.json secrets/opencode/auth.json
+nano secrets/opencode/auth.json
 nano .env
 ```
 
@@ -134,12 +135,14 @@ EC2 `.env` example:
 ```env
 WORKSPACE_ROOT=/data/workspaces
 OPENCODE_BIN=opencode
-OPENCODE_AUTH_DIR=/home/ubuntu/.local/share/opencode
+OPENCODE_AUTH_DIR=./secrets/opencode
 OPENCODE_MODEL=opencode-go/deepseek-v4-flash
 OPENCODE_MODEL_OPTIONS=
 OPENCODE_TIMEOUT_MS=600000
 APP_SECRET=change-me
 ```
+
+The EC2 host does not need opencode installed. The Docker image installs opencode; it only needs `secrets/opencode/auth.json`.
 
 Start:
 
@@ -162,7 +165,7 @@ For real family usage, put Cloudflare Tunnel and Cloudflare Access in front inst
 | --- | --- |
 | `WORKSPACE_ROOT` | Container path for uploaded files and session workspaces. Keep `/data/workspaces` for Docker. |
 | `OPENCODE_BIN` | opencode executable path. Usually `opencode`. |
-| `OPENCODE_AUTH_DIR` | Host path containing `auth.json`, mounted into the container. |
+| `OPENCODE_AUTH_DIR` | Host path containing `auth.json`, mounted into the container. Defaults to `./secrets/opencode`. |
 | `OPENCODE_MODEL` | Optional server-side default model. Use `opencode-go/<model-id>` for OpenCode Go. |
 | `OPENCODE_MODEL_OPTIONS` | Optional comma-separated model list override. Leave blank to use the built-in OpenCode Go list. |
 | `OPENCODE_TIMEOUT_MS` | Maximum time for one `opencode run` request. Default is 600000. |
@@ -183,6 +186,7 @@ For real family usage, put Cloudflare Tunnel and Cloudflare Access in front inst
 
 - Streaming is line-oriented from the `opencode run` process, so some output may still be finalized or cleaned up at the end of the request.
 - Only basic workspace isolation is implemented.
+- Chat files and outputs remain in the same session workspace, but full conversation history is not replayed into each model call yet.
 - Complex Office formatting, animations, comments, and tracked changes may not be preserved perfectly.
 - Cloudflare Access identity is not wired into per-user directories yet.
 
@@ -197,8 +201,7 @@ docker compose logs -f
 Also verify the mounted credential directory:
 
 ```bash
-echo "$HOME/.local/share/opencode"
-ls "$HOME/.local/share/opencode/auth.json"
+ls secrets/opencode/auth.json
 ```
 
 Your `.env` must point `OPENCODE_AUTH_DIR` to that host directory, not to `/data/workspaces`.
