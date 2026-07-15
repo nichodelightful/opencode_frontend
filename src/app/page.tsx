@@ -22,6 +22,17 @@ type OutputFile = {
   updatedAt: string;
 };
 
+type SessionSummary = {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type StoredMessage = Message & {
+  createdAt?: string;
+};
+
 export default function Home() {
   const [sessionId, setSessionId] = useState<string>();
   const [messages, setMessages] = useState<Message[]>([
@@ -33,6 +44,7 @@ export default function Home() {
   ]);
   const [uploads, setUploads] = useState<Upload[]>([]);
   const [outputs, setOutputs] = useState<OutputFile[]>([]);
+  const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
   const [selectedModel, setSelectedModel] = useState("opencode-go/deepseek-v4-flash");
   const [customModel, setCustomModel] = useState("");
@@ -57,6 +69,10 @@ export default function Home() {
     };
   }, []);
 
+  useEffect(() => {
+    refreshSessions();
+  }, []);
+
   const activeModel = selectedModel === "custom" ? customModel.trim() : selectedModel === "default" ? "" : selectedModel;
 
   async function refreshOutputs(nextSessionId = sessionId) {
@@ -71,6 +87,43 @@ export default function Home() {
     if (response.ok && Array.isArray(data.outputs)) {
       setOutputs(data.outputs);
     }
+  }
+
+  async function refreshSessions() {
+    const response = await fetch("/api/sessions");
+    const data = await response.json();
+
+    if (response.ok && Array.isArray(data.sessions)) {
+      setSessions(data.sessions);
+    }
+  }
+
+  async function startNewSession() {
+    const response = await fetch("/api/sessions", { method: "POST" });
+    const data = await response.json();
+    const nextSession = data.session as SessionSummary;
+
+    setSessionId(nextSession.id);
+    setUploads([]);
+    setOutputs([]);
+    setMessages([{ id: "welcome", role: "assistant", content: "把檔案拖進來，或直接告訴我你想請 AI 做什麼。" }]);
+    await refreshSessions();
+  }
+
+  async function loadSession(nextSessionId: string) {
+    const response = await fetch(`/api/sessions/${encodeURIComponent(nextSessionId)}`);
+    const data = await response.json();
+
+    if (!response.ok) return;
+
+    setSessionId(nextSessionId);
+    setUploads(Array.isArray(data.uploads) ? data.uploads : []);
+    setOutputs(Array.isArray(data.outputs) ? data.outputs : []);
+    setMessages(
+      Array.isArray(data.messages) && data.messages.length > 0
+        ? data.messages.map((message: StoredMessage) => ({ id: message.id, role: message.role, content: message.content }))
+        : [{ id: "welcome", role: "assistant", content: "這個聊天還沒有訊息。" }]
+    );
   }
 
   async function uploadFiles(files: FileList | File[]) {
@@ -89,6 +142,7 @@ export default function Home() {
 
       setSessionId(data.sessionId);
       setUploads((current) => [...current, ...data.uploads]);
+      await refreshSessions();
       setMessages((current) => [
         ...current,
         {
@@ -191,6 +245,7 @@ export default function Home() {
       }
 
       await refreshOutputs(finalSessionId);
+      await refreshSessions();
     } catch (error) {
       setMessages((current) =>
         current.map((item) =>
@@ -207,6 +262,41 @@ export default function Home() {
       <section className="mx-auto grid min-h-[calc(100vh-48px)] max-w-7xl gap-5 lg:grid-cols-[320px_1fr]">
         <aside className="rounded-[2rem] border border-black/10 bg-white/55 p-5 shadow-soft backdrop-blur">
           <h1 className="text-3xl font-semibold leading-tight">AI ChatBox</h1>
+
+          <button
+            className="mt-6 w-full rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-60"
+            disabled={isBusy}
+            onClick={startNewSession}
+            type="button"
+          >
+            新聊天
+          </button>
+
+          <div className="mt-6 space-y-3">
+            <p className="text-sm font-semibold">聊天記錄</p>
+            {sessions.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-black/15 p-4 text-sm text-black/50">還沒有聊天記錄</p>
+            ) : (
+              <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
+                {sessions.map((session) => (
+                  <button
+                    key={session.id}
+                    className={`w-full rounded-2xl p-3 text-left text-sm transition ${
+                      session.id === sessionId ? "bg-ink text-white" : "bg-white/70 hover:bg-white"
+                    }`}
+                    disabled={isBusy}
+                    onClick={() => loadSession(session.id)}
+                    type="button"
+                  >
+                    <p className="truncate font-medium">{session.title}</p>
+                    <p className={`mt-1 text-xs ${session.id === sessionId ? "text-white/60" : "text-black/45"}`}>
+                      {new Date(session.updatedAt).toLocaleString("zh-TW")}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
 
           <button
             className="mt-6 w-full rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-60"

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { ensureSessionDirs, safeSessionId } from "@/lib/workspace";
+import { appendMessages, ensureSessionDirs, getMessages, safeSessionId, setSessionTitleFromMessage } from "@/lib/workspace";
 import { cleanGeneratedOutputs, cleanModel, runOpencode, sanitizeOpencodeOutput } from "@/lib/opencode";
 
 export const runtime = "nodejs";
@@ -15,6 +15,10 @@ export async function POST(request: Request) {
   }
 
   const { sessionRoot } = await ensureSessionDirs(sessionId);
+  await appendMessages(sessionId, [{ role: "user", content: message }]);
+  await setSessionTitleFromMessage(sessionId, message);
+  const previousMessages = (await getMessages(sessionId)).slice(-10, -1);
+  const conversationContext = previousMessages.map((item) => `${item.role}: ${item.content}`).join("\n");
   let result: Awaited<ReturnType<typeof runOpencode>>;
 
   try {
@@ -24,7 +28,7 @@ export async function POST(request: Request) {
       fileCount: body.files?.length || 0,
       model: cleanModel(body.model) || process.env.OPENCODE_MODEL || "default"
     });
-    result = await runOpencode(sessionRoot, message, body.files || [], body.model);
+    result = await runOpencode(sessionRoot, message, body.files || [], body.model, conversationContext);
     await cleanGeneratedOutputs(sessionRoot);
     console.log("Finished opencode", {
       sessionId,
@@ -53,6 +57,9 @@ export async function POST(request: Request) {
     });
 
     if (result.output) {
+      await appendMessages(sessionId, [
+        { role: "assistant", content: `${result.output}\n\n[注意] opencode 有回傳內容，但其中某個工具或子步驟失敗了。` }
+      ]);
       return NextResponse.json({
         sessionId,
         reply: `${result.output}\n\n[注意] opencode 有回傳內容，但其中某個工具或子步驟失敗了。`
@@ -68,6 +75,8 @@ export async function POST(request: Request) {
       { status: 500 }
     );
   }
+
+  await appendMessages(sessionId, [{ role: "assistant", content: result.output || "opencode completed without text output." }]);
 
   return NextResponse.json({
     sessionId,

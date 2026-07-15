@@ -15,6 +15,8 @@ Browser
 
 Chat responses stream back to the browser while `opencode run` is still working. Generated files are listed after the run completes.
 
+Sessions are stored on disk under `WORKSPACE_ROOT`. Each session keeps `metadata.json`, `messages.json`, `uploads/`, and `outputs/`, and the sidebar can switch between previous chats.
+
 ## Mac Local Test
 
 You can either use your existing local opencode login, or use the example `auth.json` flow below. For this app, Docker only needs a valid `auth.json` mounted into the container.
@@ -178,6 +180,8 @@ For real family usage, put Cloudflare Tunnel and Cloudflare Access in front inst
 - `src/app/api/chat/route.ts`: calls `opencode run`.
 - `src/app/api/outputs/route.ts`: lists generated downloadable files.
 - `src/app/api/download/route.ts`: downloads files from the session `outputs/` directory.
+- `src/app/api/sessions/route.ts`: lists and creates chat sessions.
+- `src/app/api/sessions/[sessionId]/route.ts`: loads one chat session with messages and outputs.
 - `src/lib/workspace.ts`: session workspace helpers.
 - `Dockerfile`: builds Next.js and installs opencode.
 - `docker-compose.yml`: mounts workspace and opencode auth directory.

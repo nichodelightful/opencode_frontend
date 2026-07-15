@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { safeSessionId, storeUpload } from "@/lib/workspace";
+import { ensureSessionMetadata, safeSessionId, storeUpload } from "@/lib/workspace";
 
 export const runtime = "nodejs";
 
@@ -20,6 +20,7 @@ export async function POST(request: Request) {
   }
 
   const uploads = await Promise.all(files.map((file) => storeUpload(sessionId, file)));
+  await ensureSessionMetadata(sessionId);
 
   return NextResponse.json({ sessionId, uploads });
 }

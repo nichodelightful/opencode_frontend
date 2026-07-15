@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { spawn } from "child_process";
 import { cleanGeneratedOutputs, cleanModel, createOpencodeArgs, sanitizeOpencodeOutput } from "@/lib/opencode";
-import { ensureSessionDirs, safeSessionId } from "@/lib/workspace";
+import { appendMessages, ensureSessionDirs, getMessages, safeSessionId, setSessionTitleFromMessage } from "@/lib/workspace";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -45,13 +45,17 @@ export async function POST(request: Request) {
   }
 
   const { sessionRoot } = await ensureSessionDirs(sessionId);
+  await appendMessages(sessionId, [{ role: "user", content: message }]);
+  await setSessionTitleFromMessage(sessionId, message);
+  const previousMessages = (await getMessages(sessionId)).slice(-10, -1);
+  const conversationContext = previousMessages.map((item) => `${item.role}: ${item.content}`).join("\n");
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream({
     start(controller) {
       const opencodeBin = process.env.OPENCODE_BIN || "opencode";
       const timeoutMs = Number(process.env.OPENCODE_TIMEOUT_MS || 600000);
-      const args = createOpencodeArgs(sessionRoot, message, body.files || [], body.model, { format: "json" });
+      const args = createOpencodeArgs(sessionRoot, message, body.files || [], body.model, { format: "json", conversationContext });
       const child = spawn(opencodeBin, args, {
         cwd: sessionRoot,
         env: process.env,
@@ -156,13 +160,15 @@ export async function POST(request: Request) {
         );
         const finalOutput = sentOutput || fallbackOutput;
         console.log("Finished streaming opencode", { sessionId, exitCode, outputLength: finalOutput.length });
+        const reply = exitCode !== 0 && finalOutput ? `${finalOutput}\n\n[注意] opencode 有回傳內容，但其中某個工具或子步驟失敗了。` : finalOutput;
+        if (reply) await appendMessages(sessionId, [{ role: "assistant", content: reply }]);
 
         controller.enqueue(
           encoder.encode(
             sse("done", {
               sessionId,
               exitCode,
-              output: exitCode !== 0 && finalOutput ? `${finalOutput}\n\n[注意] opencode 有回傳內容，但其中某個工具或子步驟失敗了。` : finalOutput
+              output: reply
             })
           )
         );

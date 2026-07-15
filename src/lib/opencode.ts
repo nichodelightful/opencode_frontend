@@ -39,8 +39,10 @@ export function cleanModel(value: string | undefined) {
   return model;
 }
 
-export function buildTaskMessage(message: string, sessionRoot: string) {
+export function buildTaskMessage(message: string, sessionRoot: string, conversationContext = "") {
   return [
+    conversationContext ? `Recent conversation context:\n${conversationContext}` : "",
+    conversationContext ? "" : "",
     message,
     "",
     "System instruction for this web app:",
@@ -61,10 +63,10 @@ export function createOpencodeArgs(
   message: string,
   files: string[] = [],
   modelOverride?: string,
-  options: { format?: "json" } = {}
+  options: { format?: "json"; conversationContext?: string } = {}
 ) {
   const model = cleanModel(modelOverride) || cleanModel(process.env.OPENCODE_MODEL);
-  const args = ["run", buildTaskMessage(message, sessionRoot), "--dir", sessionRoot, "--auto"];
+  const args = ["run", buildTaskMessage(message, sessionRoot, options.conversationContext), "--dir", sessionRoot, "--auto"];
 
   if (model) {
     args.push("--model", model);
@@ -88,11 +90,11 @@ export function createOpencodeArgs(
   return args;
 }
 
-export function runOpencode(sessionRoot: string, message: string, files: string[] = [], modelOverride?: string) {
+export function runOpencode(sessionRoot: string, message: string, files: string[] = [], modelOverride?: string, conversationContext = "") {
   return new Promise<OpencodeResult>((resolve, reject) => {
     const opencodeBin = process.env.OPENCODE_BIN || "opencode";
     const timeoutMs = Number(process.env.OPENCODE_TIMEOUT_MS || 600000);
-    const args = createOpencodeArgs(sessionRoot, message, files, modelOverride);
+    const args = createOpencodeArgs(sessionRoot, message, files, modelOverride, { conversationContext });
     const child = spawn(opencodeBin, args, {
       cwd: sessionRoot,
       env: process.env,

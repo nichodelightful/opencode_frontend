@@ -1,4 +1,4 @@
-import { mkdir, readdir, stat, writeFile } from "fs/promises";
+import { mkdir, readFile, readdir, stat, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 
@@ -15,6 +15,20 @@ export type OutputFile = {
   name: string;
   path: string;
   size: number;
+  updatedAt: string;
+};
+
+export type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+};
+
+export type SessionMetadata = {
+  id: string;
+  title: string;
+  createdAt: string;
   updatedAt: string;
 };
 
@@ -41,6 +55,86 @@ export async function ensureSessionDirs(sessionId: string) {
   return { sessionRoot, uploadDir, outputDir };
 }
 
+async function readJson<T>(filePath: string, fallback: T): Promise<T> {
+  try {
+    return JSON.parse(await readFile(filePath, "utf-8")) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+export async function ensureSessionMetadata(sessionId: string, title = "新聊天") {
+  const { sessionRoot } = await ensureSessionDirs(sessionId);
+  const metadataPath = path.join(sessionRoot, "metadata.json");
+  const now = new Date().toISOString();
+  const current = await readJson<SessionMetadata | null>(metadataPath, null);
+
+  if (current) return current;
+
+  const metadata = { id: sessionId, title, createdAt: now, updatedAt: now };
+  await writeFile(metadataPath, JSON.stringify(metadata, null, 2));
+
+  return metadata;
+}
+
+export async function updateSessionMetadata(sessionId: string, changes: Partial<Pick<SessionMetadata, "title" | "updatedAt">>) {
+  const { sessionRoot } = await ensureSessionDirs(sessionId);
+  const metadataPath = path.join(sessionRoot, "metadata.json");
+  const current = await ensureSessionMetadata(sessionId);
+  const next = { ...current, ...changes, updatedAt: changes.updatedAt || new Date().toISOString() };
+
+  await writeFile(metadataPath, JSON.stringify(next, null, 2));
+
+  return next;
+}
+
+export async function listSessions() {
+  await mkdir(root, { recursive: true });
+  const entries = await readdir(root, { withFileTypes: true });
+  const sessions = await Promise.all(
+    entries
+      .filter((entry) => entry.isDirectory())
+      .map(async (entry) => {
+        const metadataPath = path.join(root, entry.name, "metadata.json");
+        return readJson<SessionMetadata | null>(metadataPath, null);
+      })
+  );
+
+  return sessions.filter((session): session is SessionMetadata => Boolean(session)).sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+export async function getMessages(sessionId: string) {
+  const { sessionRoot } = await ensureSessionDirs(sessionId);
+  return readJson<ChatMessage[]>(path.join(sessionRoot, "messages.json"), []);
+}
+
+export async function appendMessages(sessionId: string, messages: Array<Omit<ChatMessage, "id" | "createdAt"> & Partial<Pick<ChatMessage, "id" | "createdAt">>>) {
+  const { sessionRoot } = await ensureSessionDirs(sessionId);
+  const messagesPath = path.join(sessionRoot, "messages.json");
+  const current = await getMessages(sessionId);
+  const now = new Date().toISOString();
+  const nextMessages = messages.map((message) => ({
+    id: message.id || randomUUID(),
+    role: message.role,
+    content: message.content,
+    createdAt: message.createdAt || now
+  }));
+  const next = [...current, ...nextMessages];
+
+  await writeFile(messagesPath, JSON.stringify(next, null, 2));
+  await ensureSessionMetadata(sessionId, nextMessages.find((message) => message.role === "user")?.content.slice(0, 60) || "新聊天");
+  await updateSessionMetadata(sessionId, { updatedAt: now });
+
+  return next;
+}
+
+export async function setSessionTitleFromMessage(sessionId: string, message: string) {
+  const metadata = await ensureSessionMetadata(sessionId);
+  if (metadata.title !== "新聊天") return metadata;
+
+  return updateSessionMetadata(sessionId, { title: message.slice(0, 40) || "新聊天" });
+}
+
 export async function storeUpload(sessionId: string, file: File): Promise<StoredUpload> {
   const { uploadDir } = await ensureSessionDirs(sessionId);
   const bytes = Buffer.from(await file.arrayBuffer());
@@ -56,6 +150,28 @@ export async function storeUpload(sessionId: string, file: File): Promise<Stored
     size: file.size,
     type: file.type || "application/octet-stream"
   };
+}
+
+export async function listUploads(sessionId: string): Promise<StoredUpload[]> {
+  const { uploadDir } = await ensureSessionDirs(sessionId);
+  const entries = await readdir(uploadDir, { withFileTypes: true });
+  const files = await Promise.all(
+    entries
+      .filter((entry) => entry.isFile())
+      .map(async (entry) => {
+        const filePath = path.join(uploadDir, entry.name);
+        const info = await stat(filePath);
+
+        return {
+          name: entry.name,
+          path: filePath,
+          size: info.size,
+          type: "application/octet-stream"
+        };
+      })
+  );
+
+  return files.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export async function listOutputs(sessionId: string): Promise<OutputFile[]> {
