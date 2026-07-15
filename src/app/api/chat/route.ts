@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { ensureSessionDirs, safeSessionId } from "@/lib/workspace";
-import { cleanModel, runOpencode, sanitizeOpencodeOutput } from "@/lib/opencode";
+import { cleanGeneratedOutputs, cleanModel, runOpencode, sanitizeOpencodeOutput } from "@/lib/opencode";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -25,6 +25,7 @@ export async function POST(request: Request) {
       model: cleanModel(body.model) || process.env.OPENCODE_MODEL || "default"
     });
     result = await runOpencode(sessionRoot, message, body.files || [], body.model);
+    await cleanGeneratedOutputs(sessionRoot);
     console.log("Finished opencode", {
       sessionId,
       exitCode: result.exitCode,

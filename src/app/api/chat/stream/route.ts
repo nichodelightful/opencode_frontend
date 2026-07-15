@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { spawn } from "child_process";
-import { cleanModel, createOpencodeArgs, sanitizeOpencodeOutput } from "@/lib/opencode";
+import { cleanGeneratedOutputs, cleanModel, createOpencodeArgs, sanitizeOpencodeOutput } from "@/lib/opencode";
 import { ensureSessionDirs, safeSessionId } from "@/lib/workspace";
 
 export const runtime = "nodejs";
@@ -146,9 +146,10 @@ export async function POST(request: Request) {
         controller.close();
       });
 
-      child.on("close", (exitCode) => {
+      child.on("close", async (exitCode) => {
         clearTimeout(timeout);
         clearInterval(statusInterval);
+        await cleanGeneratedOutputs(sessionRoot);
         if (jsonBuffer.trim()) processJsonLine(jsonBuffer);
         const fallbackOutput = sanitizeOpencodeOutput(
           [rawOutput.trim(), rawError.trim()].filter(Boolean).join("\n")
