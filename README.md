@@ -16,6 +16,7 @@ Browser
 Chat responses stream back to the browser while `opencode run` is still working. Generated files are listed after the run completes.
 
 Sessions are stored on disk under `WORKSPACE_ROOT`. Each session keeps `metadata.json`, `messages.json`, `uploads/`, and `outputs/`, and the sidebar can switch between previous chats.
+Use the `×` button in the chat history list to delete a session and its workspace files.
 
 ## Mac Local Test
 

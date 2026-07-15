@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useRef, useState } from "react";
+import { FormEvent, ReactNode, useEffect, useRef, useState } from "react";
 
 type Message = {
   id: string;
@@ -32,6 +32,86 @@ type SessionSummary = {
 type StoredMessage = Message & {
   createdAt?: string;
 };
+
+function cleanInlineMarkdown(value: string) {
+  return value.replace(/`([^`]+)`/g, "$1").replace(/\*\*(.*?)\*\*/g, "$1").replace(/__(.*?)__/g, "$1");
+}
+
+function renderMessageContent(content: string) {
+  const lines = content.split("\n");
+  const nodes: ReactNode[] = [];
+  let tableRows: string[][] = [];
+
+  function flushTable() {
+    if (tableRows.length === 0) return;
+
+    const rows = tableRows.filter((row) => !row.every((cell) => /^:?-{3,}:?$/.test(cell.trim())));
+    const header = rows[0];
+    const body = rows.slice(1);
+    const key = `table-${nodes.length}`;
+
+    nodes.push(
+      <div key={key} className="my-3 overflow-x-auto rounded-2xl border border-black/10 bg-white/70">
+        <table className="min-w-full text-left text-xs">
+          {header ? (
+            <thead className="bg-black/5 text-black/70">
+              <tr>{header.map((cell, index) => <th key={index} className="px-3 py-2 font-semibold">{cleanInlineMarkdown(cell)}</th>)}</tr>
+            </thead>
+          ) : null}
+          <tbody>
+            {body.map((row, rowIndex) => (
+              <tr key={rowIndex} className="border-t border-black/10">
+                {row.map((cell, cellIndex) => <td key={cellIndex} className="px-3 py-2 align-top">{cleanInlineMarkdown(cell)}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
+    tableRows = [];
+  }
+
+  lines.forEach((line, index) => {
+    const trimmed = line.trim();
+    const tableCells = trimmed.startsWith("|") && trimmed.endsWith("|") ? trimmed.slice(1, -1).split("|").map((cell) => cell.trim()) : null;
+
+    if (tableCells && tableCells.length > 1) {
+      tableRows.push(tableCells);
+      return;
+    }
+
+    flushTable();
+
+    if (!trimmed) {
+      nodes.push(<div key={index} className="h-2" />);
+      return;
+    }
+
+    const heading = trimmed.match(/^#{1,4}\s+(.+)$/);
+    if (heading) {
+      nodes.push(<p key={index} className="mt-3 font-semibold">{cleanInlineMarkdown(heading[1])}</p>);
+      return;
+    }
+
+    const bullet = trimmed.match(/^[-*]\s+(.+)$/);
+    if (bullet) {
+      nodes.push(<p key={index} className="pl-4 before:mr-2 before:content-['•']">{cleanInlineMarkdown(bullet[1])}</p>);
+      return;
+    }
+
+    const numbered = trimmed.match(/^\d+\.\s+(.+)$/);
+    if (numbered) {
+      nodes.push(<p key={index} className="pl-4">{cleanInlineMarkdown(trimmed)}</p>);
+      return;
+    }
+
+    nodes.push(<p key={index}>{cleanInlineMarkdown(trimmed.replace(/^>\s*/, ""))}</p>);
+  });
+
+  flushTable();
+
+  return nodes;
+}
 
 export default function Home() {
   const [sessionId, setSessionId] = useState<string>();
@@ -124,6 +204,20 @@ export default function Home() {
         ? data.messages.map((message: StoredMessage) => ({ id: message.id, role: message.role, content: message.content }))
         : [{ id: "welcome", role: "assistant", content: "這個聊天還沒有訊息。" }]
     );
+  }
+
+  async function deleteChatSession(targetSessionId: string) {
+    if (!window.confirm("確定要刪除這個聊天記錄嗎？")) return;
+
+    await fetch(`/api/sessions/${encodeURIComponent(targetSessionId)}`, { method: "DELETE" });
+    await refreshSessions();
+
+    if (targetSessionId === sessionId) {
+      setSessionId(undefined);
+      setUploads([]);
+      setOutputs([]);
+      setMessages([{ id: "welcome", role: "assistant", content: "把檔案拖進來，或直接告訴我你想請 AI 做什麼。" }]);
+    }
   }
 
   async function uploadFiles(files: FileList | File[]) {
@@ -279,20 +373,30 @@ export default function Home() {
             ) : (
               <div className="max-h-52 space-y-2 overflow-y-auto pr-1">
                 {sessions.map((session) => (
-                  <button
+                  <div
                     key={session.id}
-                    className={`w-full rounded-2xl p-3 text-left text-sm transition ${
+                    className={`group flex items-start gap-2 rounded-2xl p-3 text-sm transition ${
                       session.id === sessionId ? "bg-ink text-white" : "bg-white/70 hover:bg-white"
                     }`}
-                    disabled={isBusy}
-                    onClick={() => loadSession(session.id)}
-                    type="button"
                   >
-                    <p className="truncate font-medium">{session.title}</p>
-                    <p className={`mt-1 text-xs ${session.id === sessionId ? "text-white/60" : "text-black/45"}`}>
-                      {new Date(session.updatedAt).toLocaleString("zh-TW")}
-                    </p>
-                  </button>
+                    <button className="min-w-0 flex-1 text-left" disabled={isBusy} onClick={() => loadSession(session.id)} type="button">
+                      <p className="truncate font-medium">{session.title}</p>
+                      <p className={`mt-1 text-xs ${session.id === sessionId ? "text-white/60" : "text-black/45"}`}>
+                        {new Date(session.updatedAt).toLocaleString("zh-TW")}
+                      </p>
+                    </button>
+                    <button
+                      className={`rounded-full px-2 text-base leading-6 opacity-70 transition hover:opacity-100 ${
+                        session.id === sessionId ? "text-white" : "text-black/60"
+                      }`}
+                      disabled={isBusy}
+                      onClick={() => deleteChatSession(session.id)}
+                      title="刪除聊天"
+                      type="button"
+                    >
+                      ×
+                    </button>
+                  </div>
                 ))}
               </div>
             )}
@@ -391,7 +495,7 @@ export default function Home() {
                     message.role === "user" ? "bg-ink text-white" : "bg-paper text-ink"
                   }`}
                 >
-                  {message.content}
+                  <div className="space-y-1">{message.role === "assistant" ? renderMessageContent(message.content) : message.content}</div>
                 </div>
               </div>
             ))}

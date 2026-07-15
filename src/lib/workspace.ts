@@ -1,4 +1,4 @@
-import { mkdir, readFile, readdir, stat, writeFile } from "fs/promises";
+import { mkdir, readFile, readdir, rm, stat, writeFile } from "fs/promises";
 import path from "path";
 import { randomUUID } from "crypto";
 
@@ -133,6 +133,17 @@ export async function setSessionTitleFromMessage(sessionId: string, message: str
   if (metadata.title !== "新聊天") return metadata;
 
   return updateSessionMetadata(sessionId, { title: message.slice(0, 40) || "新聊天" });
+}
+
+export async function deleteSession(sessionId: string) {
+  const sessionRoot = path.join(root, sessionId);
+  const relativePath = path.relative(root, sessionRoot);
+
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    throw new Error("Invalid session path.");
+  }
+
+  await rm(sessionRoot, { recursive: true, force: true });
 }
 
 export async function storeUpload(sessionId: string, file: File): Promise<StoredUpload> {
