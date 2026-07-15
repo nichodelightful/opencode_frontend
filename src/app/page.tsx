@@ -438,7 +438,6 @@ export default function Home() {
                 onChange={(event) => setCustomModel(event.target.value)}
               />
             ) : null}
-            <p className="text-xs leading-5 text-black/50">Go 訂閱請選 opencode-go/*。若選 opencode/* 會走 Zen 餘額。</p>
           </div>
 
           <div className="mt-6 space-y-3">
