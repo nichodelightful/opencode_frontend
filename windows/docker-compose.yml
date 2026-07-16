@@ -1,0 +1,27 @@
+services:
+  app:
+    image: ghcr.io/nichodelightful/opencode_frontend:windows
+    container_name: ai-chatbox
+    restart: unless-stopped
+    env_file:
+      - "${AI_CHATBOX_RUNTIME_ENV}"
+    environment:
+      NODE_ENV: production
+      HOME: /home/nextjs
+      WORKSPACE_ROOT: /data/workspaces
+      OPENCODE_BIN: opencode
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - type: bind
+        source: "${AI_CHATBOX_DATA_DIR}"
+        target: /data/workspaces
+      - type: bind
+        source: "${AI_CHATBOX_AUTH_DIR}"
+        target: /home/nextjs/.local/share/opencode
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 20s

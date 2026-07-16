@@ -2,6 +2,8 @@
 
 ChatGPT-style web UI backed by `opencode run`. The app runs as one Next.js container and uses an OpenCode Go `auth.json` mounted into the container.
 
+The `windows` branch also provides a WPF/WebView2 launcher and installer. See [`windows/README_WINDOWS.md`](windows/README_WINDOWS.md).
+
 ## Architecture
 
 ```text

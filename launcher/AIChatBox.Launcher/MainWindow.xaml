@@ -1,0 +1,66 @@
+<Window x:Class="AIChatBox.Launcher.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="AI ChatBox"
+        Width="1280"
+        Height="820"
+        MinWidth="920"
+        MinHeight="640"
+        WindowStartupLocation="CenterScreen"
+        Background="#F7F2EA"
+        Closing="Window_Closing"
+        Loaded="Window_Loaded">
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="54" />
+      <RowDefinition Height="*" />
+    </Grid.RowDefinitions>
+
+    <Border Grid.Row="0" Background="#171717">
+      <Grid Margin="18,0">
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width="Auto" />
+          <ColumnDefinition Width="*" />
+          <ColumnDefinition Width="Auto" />
+        </Grid.ColumnDefinitions>
+
+        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+          <Border Width="28" Height="28" CornerRadius="9" Background="#B76F52" Margin="0,0,10,0">
+            <TextBlock Text="AI" Foreground="White" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <TextBlock Text="AI ChatBox" Foreground="White" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+        </StackPanel>
+
+        <TextBlock x:Name="HeaderStatus" Grid.Column="1" Text="準備中" Foreground="#B8B3AC" HorizontalAlignment="Center" VerticalAlignment="Center" />
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+          <Button x:Name="SettingsButton" Margin="0,0,8,0" Padding="12,6" Background="#383838" Click="Settings_Click">設定</Button>
+          <Button x:Name="RestartButton" Margin="0,0,8,0" Padding="12,6" Background="#383838" Click="Restart_Click">重新啟動</Button>
+          <Button x:Name="StopButton" Padding="12,6" Background="#7B3F32" Click="Stop_Click">停止服務</Button>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <Grid Grid.Row="1">
+      <Border x:Name="StartupPanel" Background="#F7F2EA">
+        <Grid>
+          <Border Width="520" Padding="36" CornerRadius="28" Background="White" BorderBrush="#E4DDD3" BorderThickness="1">
+            <StackPanel>
+              <TextBlock Text="AI ChatBox" FontSize="34" FontWeight="SemiBold" Foreground="#171717" HorizontalAlignment="Center" />
+              <TextBlock x:Name="StartupStatus" Margin="0,14,0,22" Text="正在準備服務..." FontSize="15" Foreground="#6B655E" TextAlignment="Center" TextWrapping="Wrap" />
+              <ProgressBar x:Name="StartupProgress" Height="7" IsIndeterminate="True" Foreground="#B76F52" />
+              <TextBlock x:Name="StartupError" Margin="0,18,0,0" Foreground="#A34032" TextAlignment="Center" TextWrapping="Wrap" />
+              <StackPanel Margin="0,18,0,0" Orientation="Horizontal" HorizontalAlignment="Center">
+                <Button x:Name="RetryButton" Visibility="Collapsed" Margin="0,0,10,0" Click="Retry_Click">重試</Button>
+                <Button x:Name="InstallDockerButton" Visibility="Collapsed" Background="#B76F52" Click="InstallDocker_Click">下載 Docker Desktop</Button>
+              </StackPanel>
+            </StackPanel>
+          </Border>
+        </Grid>
+      </Border>
+
+      <wv2:WebView2 x:Name="Browser" Visibility="Collapsed" />
+    </Grid>
+  </Grid>
+</Window>

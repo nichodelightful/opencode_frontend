@@ -1,0 +1,31 @@
+<Application x:Class="AIChatBox.Launcher.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             StartupUri="MainWindow.xaml"
+             ShutdownMode="OnMainWindowClose">
+  <Application.Resources>
+    <SolidColorBrush x:Key="InkBrush" Color="#171717" />
+    <SolidColorBrush x:Key="PaperBrush" Color="#F7F2EA" />
+    <SolidColorBrush x:Key="ClayBrush" Color="#B76F52" />
+    <SolidColorBrush x:Key="MossBrush" Color="#63755F" />
+    <Style TargetType="Button">
+      <Setter Property="FontFamily" Value="Segoe UI" />
+      <Setter Property="Cursor" Value="Hand" />
+      <Setter Property="Padding" Value="14,8" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Background" Value="{StaticResource InkBrush}" />
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Button">
+            <Border Background="{TemplateBinding Background}"
+                    CornerRadius="10"
+                    Padding="{TemplateBinding Padding}">
+              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Border>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+  </Application.Resources>
+</Application>

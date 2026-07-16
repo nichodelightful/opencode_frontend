@@ -4,3 +4,6 @@ node_modules
 .next
 workspaces
 secrets/opencode/auth.json
+artifacts/
+launcher/**/bin/
+launcher/**/obj/

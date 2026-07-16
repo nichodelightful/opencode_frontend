@@ -1,0 +1,30 @@
+<Window x:Class="AIChatBox.Launcher.ApiKeyDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="設定 OpenCode Go"
+        Width="480"
+        Height="285"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner"
+        Background="#F7F2EA"
+        FontFamily="Segoe UI">
+  <Grid Margin="28">
+    <Grid.RowDefinitions>
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="Auto" />
+      <RowDefinition Height="*" />
+      <RowDefinition Height="Auto" />
+    </Grid.RowDefinitions>
+
+    <TextBlock Text="OpenCode Go API Key" FontSize="24" FontWeight="SemiBold" Foreground="#171717" />
+    <TextBlock Grid.Row="1" Margin="0,8,0,18" Text="API key 只會儲存在這台電腦的使用者資料夾。" Foreground="#6B655E" />
+    <PasswordBox x:Name="ApiKeyInput" Grid.Row="2" Height="42" Padding="12,8" FontSize="15" />
+    <TextBlock x:Name="ErrorText" Grid.Row="3" Margin="0,10,0,0" Foreground="#A34032" TextWrapping="Wrap" />
+
+    <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right">
+      <Button Margin="0,0,10,0" Background="#DED7CC" Foreground="#171717" Click="Cancel_Click">取消</Button>
+      <Button Background="#B76F52" Click="Save_Click">儲存</Button>
+    </StackPanel>
+  </Grid>
+</Window>
