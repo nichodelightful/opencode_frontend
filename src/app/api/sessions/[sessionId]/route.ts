@@ -3,8 +3,10 @@ import { deleteSession, ensureSessionMetadata, getMessages, listOutputs, listUpl
 
 export const runtime = "nodejs";
 
-export async function GET(_: Request, { params }: { params: { sessionId: string } }) {
-  const sessionId = safeSessionId(params.sessionId);
+type RouteContext = { params: Promise<{ sessionId: string }> };
+
+export async function GET(_: Request, { params }: RouteContext) {
+  const sessionId = safeSessionId((await params).sessionId);
   const session = await ensureSessionMetadata(sessionId);
   const messages = await getMessages(sessionId);
   const uploads = await listUploads(sessionId);
@@ -13,8 +15,8 @@ export async function GET(_: Request, { params }: { params: { sessionId: string 
   return NextResponse.json({ session, messages, uploads, outputs });
 }
 
-export async function DELETE(_: Request, { params }: { params: { sessionId: string } }) {
-  const sessionId = safeSessionId(params.sessionId);
+export async function DELETE(_: Request, { params }: RouteContext) {
+  const sessionId = safeSessionId((await params).sessionId);
   await deleteSession(sessionId);
 
   return NextResponse.json({ ok: true });

@@ -351,11 +351,26 @@ export default function Home() {
     }
   }
 
+  async function logout() {
+    try {
+      const response = await fetch("/api/auth/logout", { method: "POST" });
+      if (!response.ok) throw new Error("Logout failed.");
+      window.location.href = "/login";
+    } catch {
+      window.alert("登出失敗，請再試一次。");
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#fff8ed,transparent_34%),linear-gradient(135deg,#f7f2ea,#efe3d2)] px-4 py-6 text-ink sm:px-8">
       <section className="mx-auto grid min-h-[calc(100vh-48px)] max-w-7xl gap-5 lg:grid-cols-[320px_1fr]">
         <aside className="rounded-[2rem] border border-black/10 bg-white/55 p-5 shadow-soft backdrop-blur">
-          <h1 className="text-3xl font-semibold leading-tight">AI ChatBox</h1>
+          <div className="flex items-center justify-between gap-4">
+            <h1 className="text-3xl font-semibold leading-tight">AI ChatBox</h1>
+            <button className="text-xs font-semibold text-black/50 transition hover:text-ink" onClick={logout} type="button">
+              登出
+            </button>
+          </div>
 
           <button
             className="mt-6 w-full rounded-2xl bg-ink px-4 py-3 text-sm font-semibold text-white transition hover:bg-black disabled:opacity-60"
