@@ -21,7 +21,7 @@ ENV HOME=/home/nextjs
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 RUN mkdir -p /data/workspaces /home/nextjs/.local/share/opencode && chown -R nextjs:nodejs /data /home/nextjs
 RUN apk add --no-cache python3 py3-pip py3-lxml && pip3 install --break-system-packages python-docx python-pptx openpyxl
-RUN npm install -g opencode-ai
+RUN npm install -g opencode-ai && chown -R nextjs:nodejs /home/nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

@@ -198,7 +198,7 @@ The EC2 security group only needs inbound SSH from a trusted IP. Cloudflare Tunn
 | --- | --- |
 | `WORKSPACE_ROOT` | Container path for uploaded files and session workspaces. Keep `/data/workspaces` for Docker. |
 | `OPENCODE_BIN` | opencode executable path. Usually `opencode`. |
-| `OPENCODE_AUTH_DIR` | Host path containing `auth.json`, mounted into the container. Defaults to `./secrets/opencode`. |
+| `OPENCODE_AUTH_DIR` | Host directory containing `auth.json`. The file is mounted read-only while OpenCode runtime data remains writable inside the container. |
 | `OPENCODE_MODEL` | Optional server-side default model. Use `opencode-go/<model-id>` for OpenCode Go. |
 | `OPENCODE_MODEL_OPTIONS` | Optional comma-separated model list override. Leave blank to detect current models from the official OpenCode Go API, with CLI and built-in fallbacks. |
 | `OPENCODE_TIMEOUT_MS` | Maximum time for one `opencode run` request. Default is 600000. |
