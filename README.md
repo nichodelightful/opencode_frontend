@@ -61,7 +61,7 @@ OPENCODE_MODEL=opencode-go/deepseek-v4-flash
 OPENCODE_MODEL_OPTIONS=
 OPENCODE_TIMEOUT_MS=600000
 ADMIN_USERNAME=home
-ADMIN_PASSWORD=<new password with at least 12 characters>
+ADMIN_PASSWORD=<new password with at least 8 characters>
 APP_SECRET=<random secret>
 ```
 
@@ -154,7 +154,7 @@ OPENCODE_MODEL=opencode-go/deepseek-v4-flash
 OPENCODE_MODEL_OPTIONS=
 OPENCODE_TIMEOUT_MS=600000
 ADMIN_USERNAME=home
-ADMIN_PASSWORD=<new password with at least 12 characters>
+ADMIN_PASSWORD=<new password with at least 8 characters>
 APP_SECRET=<random secret>
 CLOUDFLARE_TUNNEL_TOKEN=<tunnel token>
 ```
