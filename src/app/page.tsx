@@ -138,7 +138,11 @@ export default function Home() {
     fetch("/api/models")
       .then((response) => response.json())
       .then((data) => {
-        if (!cancelled && Array.isArray(data.models)) setModelOptions(data.models);
+        if (!cancelled && Array.isArray(data.models)) {
+          const models = data.models.filter((model: unknown): model is string => typeof model === "string");
+          setModelOptions(models);
+          setSelectedModel((current) => (current === "default" || current === "custom" || models.includes(current) ? current : models[0] || "default"));
+        }
       })
       .catch(() => {
         if (!cancelled) setModelOptions([]);
