@@ -51,10 +51,10 @@ async function getSigningKey() {
 }
 
 async function getCredentialVersion() {
-  const passwordHash = process.env.ADMIN_PASSWORD_HASH;
-  if (!passwordHash) throw new Error("ADMIN_PASSWORD_HASH is required.");
+  const password = process.env.ADMIN_PASSWORD;
+  if (!password) throw new Error("ADMIN_PASSWORD is required.");
 
-  const signature = await crypto.subtle.sign("HMAC", await getSigningKey(), new TextEncoder().encode(passwordHash));
+  const signature = await crypto.subtle.sign("HMAC", await getSigningKey(), new TextEncoder().encode(password));
   return encodeBase64Url(new Uint8Array(signature).slice(0, 16));
 }
 

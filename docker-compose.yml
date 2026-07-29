@@ -8,7 +8,7 @@ services:
       HOME: /home/nextjs
       WORKSPACE_ROOT: /data/workspaces
       ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME in .env}
-      ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:?Set ADMIN_PASSWORD_HASH in .env}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
       APP_SECRET: ${APP_SECRET:?Set APP_SECRET in .env}
       OPENCODE_BIN: ${OPENCODE_BIN:-opencode}
       OPENCODE_MODEL: ${OPENCODE_MODEL:-}

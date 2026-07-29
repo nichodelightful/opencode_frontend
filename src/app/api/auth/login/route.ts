@@ -89,8 +89,8 @@ export async function POST(request: Request) {
   }
 
   const adminUsername = process.env.ADMIN_USERNAME;
-  const passwordHash = process.env.ADMIN_PASSWORD_HASH;
-  if (!adminUsername || !passwordHash) return NextResponse.json({ error: "Login is not configured on the server." }, { status: 503 });
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  if (!adminUsername || !adminPassword) return NextResponse.json({ error: "Login is not configured on the server." }, { status: 503 });
 
   let body: { username?: string; password?: string };
   try {
@@ -117,7 +117,7 @@ export async function POST(request: Request) {
 
   activeVerifications += 1;
   try {
-    const valid = username === adminUsername && (await verifyPassword(password, passwordHash));
+    const valid = username === adminUsername && (await verifyPassword(password, adminPassword));
 
     if (!valid) {
       return NextResponse.json({ error: "帳號或密碼錯誤。" }, { status: 401 });

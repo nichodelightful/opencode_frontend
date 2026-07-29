@@ -5,7 +5,6 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "hash-password": "node scripts/hash-password.mjs",
     "start": "next start",
     "lint": "next lint"
   },
