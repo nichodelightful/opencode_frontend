@@ -17,11 +17,12 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 ENV WORKSPACE_ROOT=/data/workspaces
 ENV HOME=/home/nextjs
+ARG OPENCODE_VERSION=1.18.9
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 RUN mkdir -p /data/workspaces /home/nextjs/.local/share/opencode && chown -R nextjs:nodejs /data /home/nextjs
 RUN apk add --no-cache python3 py3-pip py3-lxml && pip3 install --break-system-packages python-docx python-pptx openpyxl
-RUN npm install -g opencode-ai && chown -R nextjs:nodejs /home/nextjs
+RUN npm install -g opencode-ai@${OPENCODE_VERSION} && chown -R nextjs:nodejs /home/nextjs
 
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

@@ -11,6 +11,7 @@ services:
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in .env}
       APP_SECRET: ${APP_SECRET:?Set APP_SECRET in .env}
       OPENCODE_BIN: ${OPENCODE_BIN:-opencode}
+      OPENCODE_API_KEY: ${OPENCODE_API_KEY:?Set OPENCODE_API_KEY in .env}
       OPENCODE_MODEL: ${OPENCODE_MODEL:-}
       OPENCODE_MODEL_OPTIONS: ${OPENCODE_MODEL_OPTIONS:-}
       OPENCODE_TIMEOUT_MS: ${OPENCODE_TIMEOUT_MS:-600000}
@@ -18,7 +19,6 @@ services:
       - "127.0.0.1:${APP_PORT:-3000}:3000"
     volumes:
       - workspaces:/data/workspaces
-      - ${OPENCODE_AUTH_DIR}/auth.json:/home/nextjs/.local/share/opencode/auth.json:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/api/health"]
       interval: 10s
