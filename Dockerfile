@@ -21,7 +21,7 @@ ARG OPENCODE_VERSION=1.18.9
 
 RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
 RUN mkdir -p /data/workspaces /home/nextjs/.local/share/opencode && chown -R nextjs:nodejs /data /home/nextjs
-RUN apk add --no-cache python3 py3-pip py3-lxml && pip3 install --break-system-packages python-docx python-pptx openpyxl
+RUN apk add --no-cache poppler-utils python3 py3-pip py3-lxml && pip3 install --break-system-packages python-docx python-pptx openpyxl
 RUN npm install -g opencode-ai@${OPENCODE_VERSION} && chown -R nextjs:nodejs /home/nextjs
 
 COPY --from=builder /app/public ./public

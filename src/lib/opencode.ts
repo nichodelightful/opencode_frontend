@@ -48,6 +48,7 @@ export function buildTaskMessage(message: string, sessionRoot: string, conversat
     "System instruction for this web app:",
     `- The session workspace is ${sessionRoot}.`,
     "- Uploaded source files are in uploads/.",
+    "- PDF uploads have a server-extracted .pdf.txt attachment. Use that UTF-8 text for analysis; if it reports no text layer, explain that OCR is required.",
     "- If the user asks you to edit, convert, revise, annotate, summarize into a file, or create a Word/Excel/PowerPoint output, save the finished downloadable file in outputs/.",
     "- Do not overwrite uploaded originals. Create a new file with a clear name such as outputs/revised-original.docx, outputs/updated-deck.pptx, or outputs/analysis.xlsx.",
     "- For Office files, prefer Python tools when useful: python-docx for .docx, python-pptx for .pptx, and openpyxl for .xlsx.",

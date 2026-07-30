@@ -13,6 +13,7 @@ type Upload = {
   path: string;
   size: number;
   type: string;
+  warning?: string;
 };
 
 type OutputFile = {
@@ -241,12 +242,13 @@ export default function Home() {
       setSessionId(data.sessionId);
       setUploads((current) => [...current, ...data.uploads]);
       await refreshSessions();
+      const warnings = (data.uploads as Upload[]).map((upload) => upload.warning).filter(Boolean);
       setMessages((current) => [
         ...current,
         {
           id: crypto.randomUUID(),
           role: "assistant",
-          content: `已上傳 ${data.uploads.length} 個檔案，可以開始描述你要我怎麼處理。`
+          content: [`已上傳 ${data.uploads.length} 個檔案，可以開始描述你要我怎麼處理。`, ...warnings].join("\n\n")
         }
       ]);
     } catch (error) {
@@ -468,6 +470,7 @@ export default function Home() {
                 <div key={upload.path} className="rounded-2xl bg-white/70 p-3 text-sm">
                   <p className="truncate font-medium">{upload.name}</p>
                   <p className="mt-1 text-xs text-black/50">{Math.ceil(upload.size / 1024)} KB</p>
+                  {upload.warning ? <p className="mt-2 text-xs leading-5 text-amber-700">{upload.warning}</p> : null}
                 </div>
               ))
             )}

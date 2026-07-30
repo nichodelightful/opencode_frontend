@@ -8,12 +8,15 @@ ChatGPT-style web UI backed by `opencode run`. The app runs as one Next.js conta
 Browser
   -> Next.js Web UI
   -> /api/upload stores files in /data/workspaces/<session>/uploads
+  -> text-based PDFs are converted to bounded UTF-8 sidecars with pdftotext
   -> /api/chat runs opencode run --dir /data/workspaces/<session>
   -> generated files are saved in /data/workspaces/<session>/outputs
   -> opencode reads OPENCODE_API_KEY from the container environment
 ```
 
 Chat responses stream back to the browser while `opencode run` is still working. Generated files are listed after the run completes.
+
+PDF uploads keep the original file and create an internal `.pdf.txt` sidecar for model input. Extraction has a 60-second timeout and a 1 MB text limit. The UI warns when text is truncated, extraction fails, or the PDF has no text layer. Image-only scanned PDFs require OCR before upload.
 
 Sessions are stored on disk under `WORKSPACE_ROOT`. Each session keeps `metadata.json`, `messages.json`, `uploads/`, and `outputs/`, and the sidebar can switch between previous chats.
 Use the `×` button in the chat history list to delete a session and its workspace files.
@@ -81,6 +84,8 @@ To create downloadable Office outputs, upload a `.docx`, `.xlsx`, or `.pptx` fil
 ```
 
 Generated files appear in the left sidebar under `產出檔案`.
+
+Text-based PDFs can be uploaded directly for summarization or analysis. If the app reports that a PDF has no extractable text layer, run OCR on the document first and upload the OCR result.
 
 Stop with `Ctrl+C`, or run in background:
 
@@ -216,6 +221,7 @@ Changing `ADMIN_PASSWORD` immediately invalidates existing sessions. Rotating `A
 - Only basic workspace isolation is implemented.
 - Chat files and outputs remain in the same session workspace, but full conversation history is not replayed into each model call yet.
 - Complex Office formatting, animations, comments, and tracked changes may not be preserved perfectly.
+- Image-only scanned PDFs are detected but not OCRed by the app.
 - The built-in login is a single shared account, not a multi-user identity system.
 
 ## Troubleshooting

@@ -19,7 +19,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `${oversized.name} is larger than 100MB.` }, { status: 413 });
   }
 
-  const uploads = await Promise.all(files.map((file) => storeUpload(sessionId, file)));
+  const uploads = [];
+  for (const file of files) {
+    uploads.push(await storeUpload(sessionId, file));
+  }
   await ensureSessionMetadata(sessionId);
 
   return NextResponse.json({ sessionId, uploads });
