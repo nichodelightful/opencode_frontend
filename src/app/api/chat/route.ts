@@ -3,7 +3,7 @@ import { appendMessages, ensureSessionDirs, getMessages, safeSessionId, setSessi
 import { cleanGeneratedOutputs, cleanModel, runOpencode, sanitizeOpencodeOutput } from "@/lib/opencode";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 600;
 
 export async function POST(request: Request) {
   const body = (await request.json()) as { message?: string; sessionId?: string; files?: string[]; model?: string };

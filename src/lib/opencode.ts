@@ -39,6 +39,11 @@ export function cleanModel(value: string | undefined) {
   return model;
 }
 
+export function getOpencodeTimeoutMs() {
+  const configured = Number(process.env.OPENCODE_TIMEOUT_MS || 600000);
+  return Number.isFinite(configured) && configured > 0 ? Math.floor(configured) : 600000;
+}
+
 export function buildTaskMessage(message: string, sessionRoot: string, conversationContext = "") {
   return [
     conversationContext ? `Recent conversation context:\n${conversationContext}` : "",
@@ -94,7 +99,7 @@ export function createOpencodeArgs(
 export function runOpencode(sessionRoot: string, message: string, files: string[] = [], modelOverride?: string, conversationContext = "") {
   return new Promise<OpencodeResult>((resolve, reject) => {
     const opencodeBin = process.env.OPENCODE_BIN || "opencode";
-    const timeoutMs = Number(process.env.OPENCODE_TIMEOUT_MS || 600000);
+    const timeoutMs = getOpencodeTimeoutMs();
     const args = createOpencodeArgs(sessionRoot, message, files, modelOverride, { conversationContext });
     const child = spawn(opencodeBin, args, {
       cwd: sessionRoot,
@@ -103,12 +108,19 @@ export function runOpencode(sessionRoot: string, message: string, files: string[
       stdio: ["ignore", "pipe", "pipe"]
     });
 
+    let settled = false;
+    const fail = (error: Error) => {
+      if (settled) return;
+      settled = true;
+      reject(error);
+    };
     const timeout = setTimeout(() => {
       child.kill("SIGTERM");
-      setTimeout(() => {
-        if (!child.killed) child.kill("SIGKILL");
+      const forceKill = setTimeout(() => {
+        if (child.exitCode === null) child.kill("SIGKILL");
       }, 5000);
-      reject(new Error(`opencode timed out after ${timeoutMs}ms.`));
+      forceKill.unref();
+      fail(new Error(`opencode timed out after ${timeoutMs}ms.`));
     }, timeoutMs);
 
     let output = "";
@@ -124,10 +136,12 @@ export function runOpencode(sessionRoot: string, message: string, files: string[
 
     child.on("error", (error) => {
       clearTimeout(timeout);
-      reject(error);
+      fail(error);
     });
     child.on("close", (exitCode) => {
       clearTimeout(timeout);
+      if (settled) return;
+      settled = true;
       const combined = sanitizeOpencodeOutput(
         exitCode === 0 ? output.trim() : [output.trim(), errorOutput.trim()].filter(Boolean).join("\n")
       );

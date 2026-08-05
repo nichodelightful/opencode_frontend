@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { spawn } from "child_process";
-import { cleanGeneratedOutputs, cleanModel, createOpencodeArgs, sanitizeOpencodeOutput } from "@/lib/opencode";
+import { cleanGeneratedOutputs, cleanModel, createOpencodeArgs, getOpencodeTimeoutMs, sanitizeOpencodeOutput } from "@/lib/opencode";
 import { appendMessages, ensureSessionDirs, getMessages, safeSessionId, setSessionTitleFromMessage } from "@/lib/workspace";
 
 export const runtime = "nodejs";
-export const maxDuration = 300;
+export const maxDuration = 600;
 
 function sse(event: string, data: unknown) {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -35,6 +35,26 @@ function extractTextFromEvent(value: unknown, parentKey = ""): string[] {
   return [];
 }
 
+function extractErrorMessage(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+
+  const record = value as Record<string, unknown>;
+  const error = record.error;
+  if (typeof error === "string" && error.trim()) return error.trim();
+  if (!error || typeof error !== "object" || Array.isArray(error)) return undefined;
+
+  const errorRecord = error as Record<string, unknown>;
+  const data = errorRecord.data;
+  if (data && typeof data === "object" && !Array.isArray(data)) {
+    const message = (data as Record<string, unknown>).message;
+    if (typeof message === "string" && message.trim()) return message.trim();
+  }
+
+  if (typeof errorRecord.message === "string" && errorRecord.message.trim()) return errorRecord.message.trim();
+  if (typeof errorRecord.name === "string" && errorRecord.name.trim()) return errorRecord.name.trim();
+  return undefined;
+}
+
 export async function POST(request: Request) {
   const body = (await request.json()) as { message?: string; sessionId?: string; files?: string[]; model?: string };
   const sessionId = safeSessionId(body.sessionId);
@@ -54,7 +74,7 @@ export async function POST(request: Request) {
   const stream = new ReadableStream({
     start(controller) {
       const opencodeBin = process.env.OPENCODE_BIN || "opencode";
-      const timeoutMs = Number(process.env.OPENCODE_TIMEOUT_MS || 600000);
+      const timeoutMs = getOpencodeTimeoutMs();
       const args = createOpencodeArgs(sessionRoot, message, body.files || [], body.model, { format: "json", conversationContext });
       const child = spawn(opencodeBin, args, {
         cwd: sessionRoot,
@@ -63,13 +83,26 @@ export async function POST(request: Request) {
         stdio: ["ignore", "pipe", "pipe"]
       });
 
-      let rawOutput = "";
       let rawError = "";
       let sentOutput = "";
       let jsonBuffer = "";
+      let eventError = "";
+      let streamClosed = false;
+      let timedOut = false;
+      let spawnFailed = false;
       const startedAt = Date.now();
 
-      controller.enqueue(encoder.encode(sse("session", { sessionId })));
+      const enqueue = (event: string, data: unknown) => {
+        if (streamClosed) return;
+        controller.enqueue(encoder.encode(sse(event, data)));
+      };
+      const closeStream = () => {
+        if (streamClosed) return;
+        streamClosed = true;
+        controller.close();
+      };
+
+      enqueue("session", { sessionId });
       console.log("Starting streaming opencode", {
         sessionId,
         sessionRoot,
@@ -85,7 +118,7 @@ export async function POST(request: Request) {
           const chunk = cleaned.slice(sentOutput.length);
           if (!chunk) return;
           sentOutput = cleaned;
-          controller.enqueue(encoder.encode(sse("chunk", { chunk })));
+          enqueue("chunk", { chunk });
           return;
         }
 
@@ -93,7 +126,7 @@ export async function POST(request: Request) {
 
         const chunk = sentOutput ? `\n${cleaned}` : cleaned;
         sentOutput += chunk;
-        controller.enqueue(encoder.encode(sse("chunk", { chunk })));
+        enqueue("chunk", { chunk });
       };
 
       const processJsonLine = (line: string) => {
@@ -102,6 +135,11 @@ export async function POST(request: Request) {
 
         try {
           const event = JSON.parse(trimmed) as unknown;
+          if (event && typeof event === "object" && !Array.isArray(event) && (event as Record<string, unknown>).type === "error") {
+            const detail = extractErrorMessage(event);
+            if (detail && !eventError.includes(detail)) eventError = eventError ? `${eventError}\n${detail}` : detail;
+            return;
+          }
           const text = extractTextFromEvent(event).join("");
           emitText(text);
         } catch {
@@ -110,28 +148,26 @@ export async function POST(request: Request) {
       };
 
       const timeout = setTimeout(() => {
+        timedOut = true;
+        clearInterval(statusInterval);
         child.kill("SIGTERM");
-        setTimeout(() => {
-          if (!child.killed) child.kill("SIGKILL");
+        const forceKill = setTimeout(() => {
+          if (child.exitCode === null) child.kill("SIGKILL");
         }, 5000);
-        controller.enqueue(encoder.encode(sse("error", { detail: `opencode timed out after ${timeoutMs}ms.` })));
-        controller.close();
+        forceKill.unref();
+        enqueue("error", { detail: `opencode timed out after ${timeoutMs}ms.` });
+        closeStream();
       }, timeoutMs);
 
       const statusInterval = setInterval(() => {
         const elapsedSeconds = Math.floor((Date.now() - startedAt) / 1000);
-        controller.enqueue(
-          encoder.encode(
-            sse("status", {
-              message: `opencode 正在處理中，目前已執行 ${elapsedSeconds} 秒。若正在分析或修改 Office 檔，可能需要幾分鐘。`
-            })
-          )
-        );
+        enqueue("status", {
+          message: `opencode 正在處理中，目前已執行 ${elapsedSeconds} 秒。若正在分析或修改 Office 檔，可能需要幾分鐘。`
+        });
       }, 5000);
 
       child.stdout.on("data", (chunk) => {
         const text = chunk.toString();
-        rawOutput += text;
         jsonBuffer += text;
 
         const lines = jsonBuffer.split("\n");
@@ -144,35 +180,47 @@ export async function POST(request: Request) {
       });
 
       child.on("error", (error) => {
+        spawnFailed = true;
         clearTimeout(timeout);
         clearInterval(statusInterval);
-        controller.enqueue(encoder.encode(sse("error", { detail: sanitizeOpencodeOutput(error.message) })));
-        controller.close();
+        enqueue("error", { detail: sanitizeOpencodeOutput(error.message) });
+        closeStream();
       });
 
-      child.on("close", async (exitCode) => {
+      child.on("close", async (exitCode, signal) => {
         clearTimeout(timeout);
         clearInterval(statusInterval);
         await cleanGeneratedOutputs(sessionRoot);
+        if (timedOut || spawnFailed) return;
         if (jsonBuffer.trim()) processJsonLine(jsonBuffer);
-        const fallbackOutput = sanitizeOpencodeOutput(
-          [rawOutput.trim(), rawError.trim()].filter(Boolean).join("\n")
-        );
+        const fallbackOutput = sanitizeOpencodeOutput(rawError.trim());
         const finalOutput = sentOutput || fallbackOutput;
-        console.log("Finished streaming opencode", { sessionId, exitCode, outputLength: finalOutput.length });
-        const reply = exitCode !== 0 && finalOutput ? `${finalOutput}\n\n[注意] opencode 有回傳內容，但其中某個工具或子步驟失敗了。` : finalOutput;
+        const failed = exitCode !== 0 || signal !== null;
+        const errorDetail = sanitizeOpencodeOutput(eventError || rawError.trim()) || `opencode exited with code ${exitCode ?? signal ?? "unknown"}.`;
+        console.log("Finished streaming opencode", {
+          sessionId,
+          exitCode,
+          signal,
+          elapsedMs: Date.now() - startedAt,
+          outputLength: finalOutput.length,
+          error: failed ? errorDetail : undefined
+        });
+
+        if (failed && !finalOutput) {
+          enqueue("error", { detail: errorDetail, exitCode });
+          closeStream();
+          return;
+        }
+
+        const reply = failed ? `${finalOutput}\n\n[錯誤] ${errorDetail}` : finalOutput;
         if (reply) await appendMessages(sessionId, [{ role: "assistant", content: reply }]);
 
-        controller.enqueue(
-          encoder.encode(
-            sse("done", {
-              sessionId,
-              exitCode,
-              output: reply
-            })
-          )
-        );
-        controller.close();
+        enqueue("done", {
+          sessionId,
+          exitCode,
+          output: reply
+        });
+        closeStream();
       });
     }
   });

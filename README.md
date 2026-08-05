@@ -48,7 +48,7 @@ Edit `.env`:
 WORKSPACE_ROOT=/data/workspaces
 OPENCODE_BIN=opencode
 OPENCODE_API_KEY=<OpenCode Go API key>
-OPENCODE_MODEL=opencode-go/deepseek-v4-flash
+OPENCODE_MODEL=opencode-go/gpt-5.6-luna
 OPENCODE_MODEL_OPTIONS=
 OPENCODE_TIMEOUT_MS=600000
 ADMIN_USERNAME=home
@@ -86,6 +86,23 @@ To create downloadable Office outputs, upload a `.docx`, `.xlsx`, or `.pptx` fil
 Generated files appear in the left sidebar under `產出檔案`.
 
 Text-based PDFs can be uploaded directly for summarization or analysis. If the app reports that a PDF has no extractable text layer, run OCR on the document first and upload the OCR result.
+
+## Model Selection
+
+The default is `opencode-go/gpt-5.6-luna`, a fast international option with tool calling and native image/PDF input. The server-extracted PDF text sidecar also lets text-only models analyze text-based PDFs.
+
+| Task | Recommended models |
+| --- | --- |
+| General chat, summaries, and high-volume work | `gpt-5.6-luna`, `deepseek-v4-flash`, `mimo-v2.5` |
+| Long repository edits and coding agents | `glm-5.2`, `kimi-k2.7-code`, `deepseek-v4-pro` |
+| Difficult reasoning and highest-quality review | `kimi-k3`, `qwen3.8-max`, `grok-4.5` |
+| Office documents and business writing | `gpt-5.6-luna`, `minimax-m2.7`, `qwen3.7-plus` |
+| Image or video understanding | `qwen3.8-max`, `qwen3.7-plus`, `kimi-k3`, `kimi-k2.7-code`, `mimo-v2.5` |
+| Low-cost repetitive agent work | `deepseek-v4-flash`, `mimo-v2.5`, `hy3` |
+
+The public Go models endpoint is a catalog, not a guarantee that every model is enabled for a specific workspace. A `403 RegionError` means the selected model version is currently hosted in China and the workspace has not opted in. Open the workspace URL included in the error and enable China-hosted models, or switch to an international model such as `gpt-5.6-luna` or `grok-4.5`.
+
+Avoid deprecated compatibility IDs for new work: `minimax-m2.5`, `kimi-k2.5`, `glm-5`, `qwen3.5-plus`, `mimo-v2-pro`, and `mimo-v2-omni`. Use `OPENCODE_MODEL_OPTIONS` to restrict the dropdown to models verified for your workspace.
 
 Stop with `Ctrl+C`, or run in background:
 
@@ -141,7 +158,7 @@ EC2 `.env` example:
 WORKSPACE_ROOT=/data/workspaces
 OPENCODE_BIN=opencode
 OPENCODE_API_KEY=<OpenCode Go API key>
-OPENCODE_MODEL=opencode-go/deepseek-v4-flash
+OPENCODE_MODEL=opencode-go/gpt-5.6-luna
 OPENCODE_MODEL_OPTIONS=
 OPENCODE_TIMEOUT_MS=600000
 ADMIN_USERNAME=home
