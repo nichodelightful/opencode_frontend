@@ -1,6 +1,6 @@
 # AI Chatbox
 
-ChatGPT-style web UI backed by `opencode run`. The app runs as one Next.js container and receives the OpenCode Go API key through its private `.env` file.
+ChatGPT-style web UI backed by `opencode run`. The app runs as one Next.js container and uses a ChatGPT Plus/Pro OAuth credential stored in a private Docker volume.
 
 ## Architecture
 
@@ -11,7 +11,7 @@ Browser
   -> text-based PDFs are converted to bounded UTF-8 sidecars with pdftotext
   -> /api/chat runs opencode run --dir /data/workspaces/<session>
   -> generated files are saved in /data/workspaces/<session>/outputs
-  -> opencode reads OPENCODE_API_KEY from the container environment
+  -> opencode reads and refreshes OpenAI OAuth in the opencode-auth volume
 ```
 
 Chat responses stream back to the browser while `opencode run` is still working. Generated files are listed after the run completes.
@@ -23,16 +23,7 @@ Use the `×` button in the chat history list to delete a session and its workspa
 
 ## Mac Local Test
 
-Docker needs a valid OpenCode Go API key in `.env`.
-
-Optional local opencode check:
-
-```bash
-brew install anomalyco/tap/opencode
-opencode auth login
-opencode auth list
-opencode run "用繁體中文回答：opencode 可以正常使用嗎？"
-```
+Docker uses OpenCode's official headless ChatGPT Plus/Pro OAuth flow. ChatGPT Plus does not provide a normal OpenAI API key; the OAuth access and refresh tokens are created by `opencode auth login` and persisted in the `opencode-auth` Docker volume.
 
 Clone and configure this app:
 
@@ -47,8 +38,8 @@ Edit `.env`:
 ```env
 WORKSPACE_ROOT=/data/workspaces
 OPENCODE_BIN=opencode
-OPENCODE_API_KEY=<OpenCode Go API key>
-OPENCODE_MODEL=opencode-go/gpt-5.6-luna
+OPENCODE_PROVIDER=openai
+OPENCODE_MODEL=openai/gpt-5.4
 OPENCODE_MODEL_OPTIONS=
 OPENCODE_TIMEOUT_MS=600000
 ADMIN_USERNAME=home
@@ -65,10 +56,19 @@ chmod 600 .env
 
 Set `ADMIN_PASSWORD` to a new password that has not been shared in messages or committed anywhere. Never commit `.env`.
 
-Run with Docker:
+Start the container, then complete the one-time ChatGPT device login:
 
 ```bash
-docker compose up --build
+docker compose up --build -d
+docker compose exec app opencode auth login --provider openai --method "ChatGPT Pro/Plus (headless)"
+```
+
+Open the URL printed by the command, enter its device code, and sign in with the ChatGPT Plus account. Verify the persistent credential and available subscription models:
+
+```bash
+docker compose exec app opencode auth list
+docker compose exec app opencode models openai --refresh
+docker compose exec app opencode run --model openai/gpt-5.4 "用繁體中文回答：ChatGPT OAuth 可以正常使用嗎？"
 ```
 
 Open:
@@ -89,20 +89,16 @@ Text-based PDFs can be uploaded directly for summarization or analysis. If the a
 
 ## Model Selection
 
-The default is `opencode-go/gpt-5.6-luna`, a fast international option with tool calling and native image/PDF input. The server-extracted PDF text sidecar also lets text-only models analyze text-based PDFs.
+The default is `openai/gpt-5.4`. The dropdown is populated from the OpenAI models that OpenCode allows for ChatGPT Plus/Pro OAuth; the exact list can change with the subscription and OpenCode version.
 
 | Task | Recommended models |
 | --- | --- |
-| General chat, summaries, and high-volume work | `gpt-5.6-luna`, `deepseek-v4-flash`, `mimo-v2.5` |
-| Long repository edits and coding agents | `glm-5.2`, `kimi-k2.7-code`, `deepseek-v4-pro` |
-| Difficult reasoning and highest-quality review | `kimi-k3`, `qwen3.8-max`, `grok-4.5` |
-| Office documents and business writing | `gpt-5.6-luna`, `minimax-m2.7`, `qwen3.7-plus` |
-| Image or video understanding | `qwen3.8-max`, `qwen3.7-plus`, `kimi-k3`, `kimi-k2.7-code`, `mimo-v2.5` |
-| Low-cost repetitive agent work | `deepseek-v4-flash`, `mimo-v2.5`, `hy3` |
+| General chat, summaries, Office documents, and research | `openai/gpt-5.4` |
+| Faster and lighter repetitive work | `openai/gpt-5.4-mini` |
+| Repository edits, scripts, and complex Excel automation | `openai/gpt-5.3-codex-spark` |
+| Difficult reasoning and review | `openai/gpt-5.5` when shown by `opencode models openai` |
 
-The public Go models endpoint is a catalog, not a guarantee that every model is enabled for a specific workspace. A `403 RegionError` means the selected model version is currently hosted in China and the workspace has not opted in. Open the workspace URL included in the error and enable China-hosted models, or switch to an international model such as `gpt-5.6-luna` or `grok-4.5`.
-
-Avoid deprecated compatibility IDs for new work: `minimax-m2.5`, `kimi-k2.5`, `glm-5`, `qwen3.5-plus`, `mimo-v2-pro`, and `mimo-v2-omni`. Use `OPENCODE_MODEL_OPTIONS` to restrict the dropdown to models verified for your workspace.
+Office file creation is performed by OpenCode tools plus the Python libraries in the image, not by a special Office model. Text-based PDFs use the server-extracted sidecar. Image analysis requires a model with image input. ChatGPT's web image-generation feature is not automatically exposed through OpenCode OAuth, so image output still needs a separate image-generation tool or API.
 
 Stop with `Ctrl+C`, or run in background:
 
@@ -157,8 +153,8 @@ EC2 `.env` example:
 ```env
 WORKSPACE_ROOT=/data/workspaces
 OPENCODE_BIN=opencode
-OPENCODE_API_KEY=<OpenCode Go API key>
-OPENCODE_MODEL=opencode-go/gpt-5.6-luna
+OPENCODE_PROVIDER=openai
+OPENCODE_MODEL=openai/gpt-5.4
 OPENCODE_MODEL_OPTIONS=
 OPENCODE_TIMEOUT_MS=600000
 ADMIN_USERNAME=home
@@ -167,7 +163,7 @@ APP_SECRET=<random secret>
 CLOUDFLARE_TUNNEL_TOKEN=<tunnel token>
 ```
 
-The EC2 host does not need opencode installed. The Docker image installs a pinned opencode version and reads `OPENCODE_API_KEY` from `.env`.
+The EC2 host does not need opencode installed. The Docker image installs a pinned version, and the `opencode-auth` named volume keeps the OAuth refresh token across container rebuilds.
 
 The app port is bound to `127.0.0.1` only. Do not open EC2 inbound port 3000 for production use.
 
@@ -175,8 +171,13 @@ Start locally on the EC2 host:
 
 ```bash
 docker compose up --build -d
-docker compose logs -f
+docker compose exec app opencode auth login --provider openai --method "ChatGPT Pro/Plus (headless)"
+docker compose exec app opencode auth list
+docker compose exec app opencode models openai --refresh
+docker compose exec app opencode run --model openai/gpt-5.4 "用繁體中文回覆 hello"
 ```
+
+The login command prints `https://auth.openai.com/codex/device` and a one-time code. Open that URL on your own computer, enter the code, and authenticate with the ChatGPT Plus account. Do not use a personal subscription as a shared public API for unrelated users.
 
 Verify on the EC2 host:
 
@@ -200,15 +201,41 @@ docker compose logs -f app cloudflared
 
 The EC2 security group only needs inbound SSH from a trusted IP. Cloudflare Tunnel makes an outbound connection, so ports 80, 443, and 3000 do not need inbound rules.
 
+### Migrate an Existing OpenCode Go Deployment
+
+Pull the new image configuration and change only these lines in the existing private `.env`:
+
+```env
+OPENCODE_PROVIDER=openai
+OPENCODE_MODEL=openai/gpt-5.4
+OPENCODE_MODEL_OPTIONS=
+OPENCODE_API_KEY=
+```
+
+Recreate the app, complete OAuth, verify it, and restart the app once:
+
+```bash
+git pull
+docker compose --profile tunnel up --build --force-recreate -d
+docker compose exec app opencode auth login --provider openai --method "ChatGPT Pro/Plus (headless)"
+docker compose exec app opencode auth list
+docker compose exec app opencode run --model openai/gpt-5.4 "用繁體中文回覆：OAuth 已完成"
+docker compose --profile tunnel restart app
+docker compose logs -f app cloudflared
+```
+
+Normal `docker compose down` keeps the OAuth and workspace volumes. Do not run `docker compose down -v` unless you intentionally want to delete both the saved ChatGPT login and all chat workspaces.
+
 ## Environment Variables
 
 | Variable | Purpose |
 | --- | --- |
 | `WORKSPACE_ROOT` | Container path for uploaded files and session workspaces. Keep `/data/workspaces` for Docker. |
 | `OPENCODE_BIN` | opencode executable path. Usually `opencode`. |
-| `OPENCODE_API_KEY` | OpenCode Go API key passed to the container. Keep `.env` private and never commit it. |
-| `OPENCODE_MODEL` | Optional server-side default model. Use `opencode-go/<model-id>` for OpenCode Go. |
-| `OPENCODE_MODEL_OPTIONS` | Optional comma-separated model list override. Leave blank to detect current models from the official OpenCode Go API, with CLI and built-in fallbacks. |
+| `OPENCODE_PROVIDER` | Provider used to discover dropdown models. Use `openai` for ChatGPT Plus/Pro OAuth. |
+| `OPENCODE_API_KEY` | Optional OpenCode Go rollback key. Leave blank for ChatGPT OAuth. |
+| `OPENCODE_MODEL` | Server-side default model. Use `openai/gpt-5.4` for ChatGPT OAuth. |
+| `OPENCODE_MODEL_OPTIONS` | Optional comma-separated dropdown override. Leave blank to discover OAuth-compatible OpenAI models through the CLI. |
 | `OPENCODE_TIMEOUT_MS` | Maximum time for one `opencode run` request. Default is 600000. |
 | `ADMIN_USERNAME` | Single account username for the web login. |
 | `ADMIN_PASSWORD` | Single account password. Keep `.env` private and never commit it. |
@@ -239,6 +266,7 @@ Changing `ADMIN_PASSWORD` immediately invalidates existing sessions. Rotating `A
 - Chat files and outputs remain in the same session workspace, but full conversation history is not replayed into each model call yet.
 - Complex Office formatting, animations, comments, and tracked changes may not be preserved perfectly.
 - Image-only scanned PDFs are detected but not OCRed by the app.
+- ChatGPT OAuth gives OpenCode model access but does not reproduce every feature of the ChatGPT website, such as its image-generation UI or custom GPTs.
 - The built-in login is a single shared account, not a multi-user identity system.
 
 ## Troubleshooting
@@ -249,18 +277,18 @@ If the browser shows `opencode failed.`, check the real error with:
 docker compose logs -f
 ```
 
-Verify that OpenCode detects the environment credential:
+Verify that OpenCode detects the persistent OAuth credential:
 
 ```bash
 docker compose exec app opencode auth list
 ```
 
-The output should list `OpenCode Go` under `Environment` with `OPENCODE_API_KEY`.
+The output should list `OpenAI oauth`. If it is missing, repeat the headless login command. To disconnect the subscription, run `docker compose exec app opencode auth logout openai`.
 
 If the browser shows `opencode timed out`, first test the same command inside the running container:
 
 ```bash
-docker compose exec app opencode run "用繁體中文回覆 hello"
+docker compose exec app opencode run --model openai/gpt-5.4 "用繁體中文回覆 hello"
 ```
 
 The app starts opencode without an interactive stdin, so browser requests should not wait for terminal input.

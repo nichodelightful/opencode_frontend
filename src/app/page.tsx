@@ -127,7 +127,7 @@ export default function Home() {
   const [outputs, setOutputs] = useState<OutputFile[]>([]);
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [modelOptions, setModelOptions] = useState<string[]>([]);
-  const [selectedModel, setSelectedModel] = useState("opencode-go/gpt-5.6-luna");
+  const [selectedModel, setSelectedModel] = useState("openai/gpt-5.4");
   const [customModel, setCustomModel] = useState("");
   const [input, setInput] = useState("");
   const [isBusy, setIsBusy] = useState(false);

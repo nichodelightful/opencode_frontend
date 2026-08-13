@@ -13,6 +13,13 @@ let cachedResult: DiscoveryResult = { models: [], source: "fallback" };
 let cacheExpiresAt = 0;
 let pendingDiscovery: Promise<DiscoveryResult> | null = null;
 
+const defaultOpenAiOauthModels = [
+  "openai/gpt-5.4",
+  "openai/gpt-5.4-mini",
+  "openai/gpt-5.3-codex-spark",
+  "openai/gpt-5.5"
+];
+
 const defaultGoModels = [
   "opencode-go/grok-4.5",
   "opencode-go/kimi-k3",
@@ -39,6 +46,24 @@ const defaultGoModels = [
   "opencode-go/hy3-preview"
 ];
 
+function selectedProvider() {
+  const provider = (process.env.OPENCODE_PROVIDER || process.env.OPENCODE_MODEL?.split("/")[0] || "openai").trim();
+  return /^[A-Za-z0-9._-]{1,80}$/.test(provider) ? provider : "openai";
+}
+
+function isChatGptOauthModel(model: string) {
+  const id = model.slice("openai/".length);
+  if (["gpt-5.4", "gpt-5.4-fast", "gpt-5.4-mini", "gpt-5.4-mini-fast", "gpt-5.3-codex-spark", "gpt-5.5"].includes(id)) return true;
+  if (["gpt-5.5-pro", "gpt-5.6"].includes(id)) return false;
+
+  const version = id.match(/^gpt-(\d+\.\d+)(?:-|$)/)?.[1];
+  return version ? Number(version) > 5.4 : false;
+}
+
+function filterProviderModels(models: string[], provider: string) {
+  return provider === "openai" ? models.filter(isChatGptOauthModel) : models;
+}
+
 function configuredModels() {
   return (process.env.OPENCODE_MODEL_OPTIONS || "")
     .split(",")
@@ -46,18 +71,19 @@ function configuredModels() {
     .filter(Boolean);
 }
 
-function modelResponse(models: string[], source: "api" | "opencode" | "configured" | "fallback") {
-  return NextResponse.json({ models, source }, { headers: { "Cache-Control": "no-store" } });
+function modelResponse(models: string[], source: "api" | "opencode" | "configured" | "fallback", provider: string) {
+  return NextResponse.json({ models, source, provider }, { headers: { "Cache-Control": "no-store" } });
 }
 
-function parseGoModels(output: string) {
+function parseProviderModels(output: string, provider: string) {
+  const prefix = `${provider}/`;
   const models = output
     .replace(/\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])/g, "")
     .split("\n")
     .map((line) => line.trim())
-    .filter((line) => /^opencode-go\/\S+$/.test(line));
+    .filter((line) => line.startsWith(prefix) && !/\s/.test(line));
 
-  return Array.from(new Set(models));
+  return filterProviderModels(Array.from(new Set(models)), provider);
 }
 
 async function fetchGoModels() {
@@ -85,16 +111,16 @@ async function fetchGoModels() {
   }
 }
 
-async function discoverGoModels(): Promise<DiscoveryResult> {
-  const apiModels = await fetchGoModels();
-  if (apiModels.length > 0) return { models: apiModels, source: "api" };
+async function discoverProviderModels(provider: string): Promise<DiscoveryResult> {
+  if (provider === "opencode-go") {
+    const apiModels = await fetchGoModels();
+    if (apiModels.length > 0) return { models: apiModels, source: "api" };
+  }
 
   const opencodeBin = process.env.OPENCODE_BIN || "opencode";
   const attempts = [
-    ["models", "opencode-go", "--refresh"],
-    ["models", "opencode-go"],
-    ["models", "--refresh"],
-    ["models"]
+    ["models", provider, "--refresh"],
+    ["models", provider]
   ];
 
   for (const args of attempts) {
@@ -105,21 +131,21 @@ async function discoverGoModels(): Promise<DiscoveryResult> {
         timeout: 10_000,
         maxBuffer: 1024 * 1024
       });
-      const models = parseGoModels(String(stdout));
+      const models = parseProviderModels(String(stdout), provider);
       if (models.length > 0) return { models, source: "opencode" };
     } catch {
-      // Try the cache and the unfiltered provider list before using the fallback.
+      // Try the cached provider list before using the built-in fallback.
     }
   }
 
   return { models: [], source: "fallback" };
 }
 
-async function detectedModels() {
+async function detectedModels(provider: string) {
   if (Date.now() < cacheExpiresAt) return cachedResult;
   if (pendingDiscovery) return pendingDiscovery;
 
-  pendingDiscovery = discoverGoModels()
+  pendingDiscovery = discoverProviderModels(provider)
     .then((result) => {
       cachedResult = result;
       cacheExpiresAt = Date.now() + (result.models.length > 0 ? dynamicCacheMs : fallbackCacheMs);
@@ -133,13 +159,17 @@ async function detectedModels() {
 }
 
 export async function GET() {
+  const provider = selectedProvider();
   const configured = configuredModels();
   if (configured.length > 0) {
-    return modelResponse(configured, "configured");
+    return modelResponse(configured, "configured", provider);
   }
 
-  const detected = await detectedModels();
-  const models = detected.models.length > 0 ? detected.models : defaultGoModels;
+  const detected = await detectedModels(provider);
+  const fallbackModels = provider === "opencode-go" ? defaultGoModels : provider === "openai" ? defaultOpenAiOauthModels : [];
+  const defaultModel = process.env.OPENCODE_MODEL;
+  const configuredDefault = defaultModel?.startsWith(`${provider}/`) ? [defaultModel] : [];
+  const models = detected.models.length > 0 ? detected.models : fallbackModels.length > 0 ? fallbackModels : configuredDefault;
 
-  return modelResponse(models, detected.source);
+  return modelResponse(models, detected.models.length > 0 ? detected.source : "fallback", provider);
 }
