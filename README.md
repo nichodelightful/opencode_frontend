@@ -2,6 +2,8 @@
 
 ChatGPT-style web UI backed by `opencode run`. The app runs as one Next.js container and uses a ChatGPT Plus/Pro OAuth credential stored in a private Docker volume.
 
+Development and deployment session context is recorded in [`SESSION_HANDOFF.md`](SESSION_HANDOFF.md).
+
 ## Architecture
 
 ```text
